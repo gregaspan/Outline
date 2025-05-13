@@ -15,7 +15,12 @@ export default function Page() {
             TODO: Landing page
           </p>
 
-
+          <a
+            className="btn btn-primary"
+            href="https://outline.so/docs"
+            target="_blank"
+          >
+            Documentation & tutorials{" "}
             <svg
               xmlns="http://www.w3.org/2000/svg"
               viewBox="0 0 20 20"
@@ -28,6 +33,7 @@ export default function Page() {
                 clipRule="evenodd"
               />
             </svg>
+          </a>
 
         </section>
       </main>

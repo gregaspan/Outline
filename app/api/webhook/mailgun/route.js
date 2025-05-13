@@ -4,6 +4,7 @@ import config from "@/config";
 import crypto from "crypto";
 
 // This route is used to receive emails from Mailgun and forward them to our customer support email.
+// See more: https://outline.so/docs/features/emails
 export async function POST(req) {
   try {
     const formData = await req.formData();
