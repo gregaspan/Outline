@@ -1,8 +1,8 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
-import uuid, io
-from PyPDF2 import PdfReader
+import uuid, io, tempfile, os
 from docx import Document
+from pdf2docx import Converter
 
 app = FastAPI()
 
@@ -10,86 +10,108 @@ app = FastAPI()
 def index():
     return """
 <html><body>
-  <input type=file id=file accept="application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onchange="upload(this.files[0])">
-  <pre id=output></pre>
+  <input type="file" id="file"
+         accept="application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+         onchange="upload(this.files[0])">
+  <pre id="output"></pre>
   <script>
     async function upload(f) {
       const out = document.getElementById('output');
-      let fd = new FormData(); fd.append('file', f);
-      let url = '';
-      // Detect by MIME type or extension
+      let fd = new FormData();
+      fd.append('file', f);
+
+      let url;
       if (f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf')) {
         url = '/upload-pdf';
-      } else if (f.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || f.name.toLowerCase().endsWith('.docx')) {
+      } else if (
+        f.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+        f.name.toLowerCase().endsWith('.docx')
+      ) {
         url = '/upload-docx';
       } else {
-        out.textContent = 'Unsupported file type';
+        out.textContent = 'Unsupported file type – please upload PDF or DOCX';
         return;
       }
+
       try {
-        let res = await fetch(url, { method:'POST', body:fd });
+        let res = await fetch(url, { method: 'POST', body: fd });
         if (!res.ok) throw new Error(await res.text());
         let j = await res.json();
         out.textContent = JSON.stringify(j, null, 2);
-      } catch(e) {
-        out.textContent = 'Error: '+e;
+      } catch (e) {
+        out.textContent = 'Error: ' + e;
       }
     }
   </script>
 </body></html>
 """
 
-@app.post("/upload-pdf")
-async def upload_pdf(file: UploadFile = File(...)):
-    if file.content_type != "application/pdf":
-        raise HTTPException(400, "Upload a PDF.")
-    data = await file.read()
-    reader = PdfReader(io.BytesIO(data))
-    text = "\n".join(p.extract_text() or '' for p in reader.pages)
-
-    # Paragraph logic
-    lines = text.splitlines()
-    pars = []
-    cur = ""
-    for l in lines:
-        s = l.strip()
-        if not s:
-            if cur:
-                pars.append(cur)
-                cur = ''
-        elif cur and s[0].isupper() and not cur.endswith('-'):
-            pars.append(cur)
-            cur = s
-        else:
-            cur = f"{cur} {s}" if cur else s
-    if cur:
-        pars.append(cur)
-
-    return JSONResponse([
-        {"id": str(uuid.uuid4()), "type": "paragraph", "content": p}
-        for p in pars
-    ])
-
 @app.post("/upload-docx")
 async def upload_docx(file: UploadFile = File(...)):
-    if file.content_type not in ("application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/octet-stream"):
+    # Validate DOCX upload
+    if (
+        file.content_type
+        != "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        and not file.filename.lower().endswith(".docx")
+    ):
         raise HTTPException(400, "Upload a DOCX file.")
+    
     data = await file.read()
     try:
         doc = Document(io.BytesIO(data))
     except Exception as e:
         raise HTTPException(400, f"Error reading DOCX: {e}")
 
-    result = []
+    return JSONResponse(_extract_paragraphs(doc))
+
+
+@app.post("/upload-pdf")
+async def upload_pdf(file: UploadFile = File(...)):
+    # Validate PDF upload
+    if file.content_type != "application/pdf" and not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(400, "Upload a PDF file.")
+    
+    # Write PDF to a temp file
+    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp_pdf:
+        tmp_pdf.write(await file.read())
+        tmp_pdf_path = tmp_pdf.name
+
+    # Prepare temp output .docx path
+    tmp_docx_path = tmp_pdf_path[:-4] + ".docx"
+    
+    # Convert PDF→DOCX
+    try:
+        conv = Converter(tmp_pdf_path)
+        conv.convert(tmp_docx_path)  # all pages by default
+        conv.close()
+    except Exception as e:
+        os.unlink(tmp_pdf_path)
+        raise HTTPException(500, f"PDF→DOCX conversion failed: {e}")
+
+    # Read the generated DOCX
+    try:
+        doc = Document(tmp_docx_path)
+    except Exception as e:
+        raise HTTPException(500, f"Error reading converted DOCX: {e}")
+    finally:
+        # clean up temp files
+        os.unlink(tmp_pdf_path)
+        os.unlink(tmp_docx_path)
+
+    return JSONResponse(_extract_paragraphs(doc))
+
+
+def _extract_paragraphs(doc: Document):
+    """Helper: pull non‐empty paragraphs out of a python-docx Document."""
+    out = []
     for para in doc.paragraphs:
         text = para.text.strip()
         if not text:
             continue
-        result.append({
+        out.append({
             "id": str(uuid.uuid4()),
             "type": "paragraph",
             "style": para.style.name,
             "content": text
         })
-
-    return JSONResponse(result)
+    return out
