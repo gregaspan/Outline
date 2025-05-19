@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react"
-import { List, Heading1, Heading2, CheckSquare, Code } from "lucide-react"
+import { Heading1, Heading2 } from "lucide-react"
 import { cn } from "../libs/utils"
 
 export default function BlockMenu({ position, onSelect, filter, onFilterChange }) {
@@ -9,12 +9,11 @@ export default function BlockMenu({ position, onSelect, filter, onFilterChange }
     const menuRef = useRef(null)
 
     const blockOptions = [
-        { type: "paragraph", label: "Text", icon: <span className="text-lg">¶</span>, description: "Just start writing with plain text." },
-        { type: "heading-1", label: "Heading 1", icon: <Heading1 className="h-4 w-4" />, description: "Big section heading." },
-        { type: "heading-2", label: "Heading 2", icon: <Heading2 className="h-4 w-4" />, description: "Medium section heading." },
-        { type: "bulleted-list", label: "Bullet List", icon: <List className="h-4 w-4" />, description: "Create a simple bulleted list." },
-        { type: "todo", label: "To-do List", icon: <CheckSquare className="h-4 w-4" />, description: "Track tasks with a to-do list." },
-        { type: "code", label: "Code", icon: <Code className="h-4 w-4" />, description: "Capture a code snippet." },
+        { type: "paragraph", label: "Text", icon: <span className="text-lg">¶</span> },
+        { type: "heading-1", label: "Heading 1", icon: <Heading1 className="h-4 w-4" /> },
+        { type: "heading-2", label: "Heading 2", icon: <Heading2 className="h-4 w-4" /> },
+        { type: "heading-3", label: "Heading 3", icon: <span className="text-lg">3</span> },
+        { type: "caption", label: "Caption", icon: <span className="text-sm italic">❝</span> },
     ]
 
     const filteredOptions = blockOptions.filter(o => o.label.toLowerCase().includes(filter.toLowerCase()))
@@ -49,7 +48,6 @@ export default function BlockMenu({ position, onSelect, filter, onFilterChange }
     }, [selectedIndex, filteredOptions, onSelect, filter, onFilterChange])
 
     useEffect(() => { setSelectedIndex(0) }, [filteredOptions.length])
-
     useEffect(() => {
         const el = document.getElementById(`block-option-${selectedIndex}`)
         if (el && menuRef.current) {
@@ -80,10 +78,7 @@ export default function BlockMenu({ position, onSelect, filter, onFilterChange }
                         onMouseEnter={() => setSelectedIndex(idx)}
                     >
                         <div className="flex-shrink-0 w-5 h-5 flex items-center justify-center">{opt.icon}</div>
-                        <div>
-                            <div className="font-medium">{opt.label}</div>
-                            <div className="text-xs text-gray-500">{opt.description}</div>
-                        </div>
+                        <div className="font-medium">{opt.label}</div>
                     </div>
                 ))}
             </div>
