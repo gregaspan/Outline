@@ -1,35 +1,22 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
-import uuid, io, tempfile, os, re
+import uuid, io, tempfile, os, re, requests
 from docx import Document
 from pdf2docx import Converter
+from dotenv import load_dotenv
+from pathlib import Path
+
+
+root = Path(__file__).resolve().parent.parent
+env_path = root / ".env.local"
+load_dotenv(dotenv_path=env_path)
+
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+if not GEMINI_API_KEY:
+    raise RuntimeError("Please set GEMINI_API_KEY in your .env.local")
+
 
 app = FastAPI()
-
-REQUIRED_SECTIONS = {
-    "Uvod": [r"cilj", r"cilji", r"namen tega dela", r"namen tega dela je", r"predpostav", r"raziskovaln", r"omejitev"],
-    "Pregled literature": [r"pregled literature", r"reference", r"navaj"],
-    "Metodologija": [r"metodolog"],
-    "Rezultati": [r"rezultat"],
-    "Zaključek": [r"zaključek"]
-}
-
-SECTION_ALIASES = {
-    "Pregled literature": [r"pregled literature", r"viri in literatura"]
-}
-
-INTRO_SUBCOMPONENTS = {
-    "Jasno izraženi cilji": [r"namen tega dela je", r"cilj naloge"],
-    "Izpostavljene predpostavke": [r"predpostavk", r"predpostavka"],
-    "Opredeljena raziskovalna vprašanja": [r"raziskovaln(a|o) vprašanj(e)?"],
-    "Določena območja in omejitve": [r"omejit(e)?"],
-}
-
-EXPECTED_ORDER = [
-    "Naslovna stran", "Zahvala", "Povzetek SI", "Povzetek EN", "Kazalo vsebine",
-    "Kazalo slik", "Kazalo tabel", "Uvod", "Pregled literature", "Metodologija",
-    "Rezultati", "Zaključek", "Seznam virov", "Priloge", "Izjave"
-]
 
 MANDATORY_FRONT_MATTER = {
     "Naslovna stran": [r"naslov", r"studenta", r"program"],
@@ -70,163 +57,144 @@ def index():
 </body></html>
 """
 
+
 @app.post("/upload-docx")
 async def upload_docx(file: UploadFile = File(...)):
     if not file.filename.lower().endswith(".docx"):
-        raise HTTPException(400, "Upload a DOCX file.")
+        raise HTTPException(400, "Please upload a DOCX file.")
     data = await file.read()
     try:
         doc = Document(io.BytesIO(data))
     except Exception as e:
         raise HTTPException(400, f"Error reading DOCX: {e}")
+
     paragraphs = _extract_paragraphs(doc)
-    structure = _analyze_structure_and_order(paragraphs)
     front = _check_front_matter(paragraphs)
-    intro = _analyze_introduction_components(paragraphs)
+    toc = _extract_toc(paragraphs)
+    uvod = _extract_uvod(paragraphs)
+
     return JSONResponse({
         "paragraphs": paragraphs,
-        "structure_analysis": structure,
         "front_matter_check": front,
-        "introduction_components": intro
+        "table_of_contents": toc,
+        "uvod": uvod
     })
 
 @app.post("/upload-pdf")
 async def upload_pdf(file: UploadFile = File(...)):
     if not file.filename.lower().endswith(".pdf"):
-        raise HTTPException(400, "Upload a PDF file.")
-    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp_pdf:
-        tmp_pdf.write(await file.read())
-        tmp_pdf_path = tmp_pdf.name
-    tmp_docx_path = tmp_pdf_path[:-4] + ".docx"
+        raise HTTPException(400, "Please upload a PDF file.")
+    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+        tmp.write(await file.read())
+        pdf_path = tmp.name
+
+    docx_path = pdf_path[:-4] + ".docx"
     try:
-        conv = Converter(tmp_pdf_path)
-        conv.convert(tmp_docx_path)
+        conv = Converter(pdf_path)
+        conv.convert(docx_path)
         conv.close()
     except Exception as e:
-        os.unlink(tmp_pdf_path)
-        raise HTTPException(500, f"PDF→DOCX conversion failed: {e}")
+        os.unlink(pdf_path)
+        raise HTTPException(500, f"Conversion failed: {e}")
+
     try:
-        doc = Document(tmp_docx_path)
+        doc = Document(docx_path)
     except Exception as e:
         raise HTTPException(500, f"Error reading converted DOCX: {e}")
     finally:
-        os.unlink(tmp_pdf_path)
-        os.unlink(tmp_docx_path)
+        os.unlink(pdf_path)
+        os.unlink(docx_path)
+
     paragraphs = _extract_paragraphs(doc)
-    structure = _analyze_structure_and_order(paragraphs)
     front = _check_front_matter(paragraphs)
-    intro = _analyze_introduction_components(paragraphs)
+    toc = _extract_toc(paragraphs)
+    uvod = _extract_uvod(paragraphs)
+
     return JSONResponse({
         "paragraphs": paragraphs,
-        "structure_analysis": structure,
         "front_matter_check": front,
-        "introduction_components": intro
+        "table_of_contents": toc,
+        "uvod": uvod
     })
+
+@app.get("/ai")
+def ai_check():
+    url = (
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
+        f"?key={GEMINI_API_KEY}"
+    )
+    body = {
+"contents": [
+    {"parts": [{"text": """Uvod mora biti napisan po teh navodilih: Prvi odstavek uvoda se začne s kratko predstavitvijo širšega in zatem ožjega področja. Navedite, zakaj je pomembno. V drugem odstavku opišite problem in raziskovalna vprašanja oz. cilje.  V tretjem odstavku navedite, kaj boste naredili v projektu v zvezi z zastavljenimi raziskovalnimi vprašanji oz. cilji. Četrti odstavek vključuje kratko napoved vsebine nadaljnjih poglavij. 
+                Uvod ima samo te štiri odstavke in naj bo dolg stran ali dve. Naj ne bo razdeljen na podpoglavja. Pandemija COVID-19 je leta 2020 močno preoblikovala način dela v številnih panogah, še posebej v sektorju informacijske tehnologije (IT). Čez noč so se morala podjetja prilagoditi delu na daljavo, kar je pomenilo velik preskok v načinu vodenja projektov in vključevanja ekip. Delo od doma je postalo “nova resničnost” za milijone delavcev po svetu, projektni vodje pa so se znašli pred izzivom, kako na daljavo učinkovito voditi projekte in hkrati ohranjati povezane in motivirane delovne skupine. V IT sektorju, kjer so ekipe pogosto geografsko razpršene in so projekti kompleksni, je razvoj dobrih praks za vodenje na daljavo ključnega pomena.
+V tej raziskovalni projektni nalogi se osredotočamo na dobre prakse vključevanja in vodenja projektov na daljavo v obdobju po letu 2020, s poudarkom na vlogi vodij projektov v IT. Posebej nas zanimajo spremembe, ki sta jih sprožili pandemija in pospešena digitalizacija, ter kako so uspešna podjetja to izkoristila v svoj prid. Raziskali bomo teoretsko ozadje fenomena dela na daljavo, identificirali izzive ter predstavili učinkovite pristope in metode za vodenje razpršenih ekip. Pri tem bomo uporabili primere znanih podjetij, kot so GitLab, Zapier in Atlassian, ki veljajo za pionirje oziroma zgledne primere oddaljenega dela v industriji. 
+                Your writing style should be concise, direct, friendly, and sound like a real human quickly dashing off a note
+                Give me feedback about my uvod, please do not write your version but give me feedback on what to improve, no examples please
+"""} ]}
+        ]
+    }
+    resp = requests.post(url, json=body, headers={"Content-Type": "application/json"})
+    if not resp.ok:
+        raise HTTPException(resp.status_code, f"Gemini API error: {resp.text}")
+    data = resp.json()
+    text = data.get("candidates", [{}])[0].get("content", "")
+    return JSONResponse({"ai_response": text})
 
 
 def _extract_paragraphs(doc: Document):
     out = []
     for para in doc.paragraphs:
         txt = para.text.strip()
-        if not txt:
-            continue
-        out.append({
-            "id": str(uuid.uuid4()),
-            "style": para.style.name,
-            "content": txt
-        })
+        if txt:
+            out.append({
+                "id": str(uuid.uuid4()),
+                "style": para.style.name,
+                "content": txt
+            })
     return out
 
 
-def _analyze_structure_and_order(paragraphs):
-    found_order = []
-    sections = {name: {'present': False, 'content': []} for name in REQUIRED_SECTIONS}
-    current = None
-    total_checks = 0
-    passed_checks = 0
-
-    for p in paragraphs:
-        txt = p['content']
-        # Detect headings by style or uppercase start
-        if 'Heading' in p['style'] or re.match(r'^[A-ZČŠŽ].{2,}$', txt):
-            # Record order for expected sections
-            for title in EXPECTED_ORDER:
-                if re.search(re.escape(title), txt, re.IGNORECASE):
-                    found_order.append(title)
-            # Assign current section based on aliases and names
-            found_section = None
-            for name in sections:
-                patterns = SECTION_ALIASES.get(name, [name])
-                for pat in patterns:
-                    if re.search(pat, txt, re.IGNORECASE):
-                        found_section = name
-                        sections[name]['present'] = True
-                        break
-                if found_section:
-                    break
-            current = found_section
-            continue
-        # Capture content under current section
-        if current:
-            sections[current]['content'].append(txt)
-    results = {}
-    for name, kws in REQUIRED_SECTIONS.items():
-        info = {'section_present': sections[name]['present'], 'keywords': {}}
-        # Section presence check
-        total_checks += 1
-        if sections[name]['present']:
-            passed_checks += 1
-        # Keyword checks
-        for kw in kws:
-            total_checks += 1
-            found = any(re.search(kw, line, re.IGNORECASE) for line in sections[name]['content'])
-            info['keywords'][kw] = found
-            if found:
-                passed_checks += 1
-        results[name] = info
-    score = int(passed_checks / total_checks * 100) if total_checks else 0
-    # Validate logical order
-    order_ok = True
-    if len(found_order) > 1:
-        order_ok = all(
-            EXPECTED_ORDER.index(found_order[i]) < EXPECTED_ORDER.index(found_order[i+1])
-            for i in range(len(found_order) - 1)
-        )
-    return {
-        'sections': results,
-        'score': score,
-        'passed_checks': passed_checks,
-        'total_checks': total_checks,
-        'found_order': found_order,
-        'order_logical': order_ok
-    }
-
-
-def _analyze_introduction_components(paragraphs):
-    intro_text = []
-    in_intro = False
-    for p in paragraphs:
-        if 'Heading' in p['style'] and re.search(r"uvod", p['content'], re.IGNORECASE):
-            in_intro = True
-            continue
-        if in_intro and 'Heading' in p['style'] and not re.search(r"uvod", p['content'], re.IGNORECASE):
-            break
-        if in_intro:
-            intro_text.append(p['content'])
-    components = {}
-    for comp, kws in INTRO_SUBCOMPONENTS.items():
-        found = any(re.search(kw, ' '.join(intro_text), re.IGNORECASE) for kw in kws)
-        components[comp] = found
-    return components
-
-
 def _check_front_matter(paragraphs):
-    checklist = {}
-    for item, kws in MANDATORY_FRONT_MATTER.items():
-        found = False
-        for p in paragraphs:
-            if any(re.search(kw, p['content'], re.IGNORECASE) for kw in kws):
-                found = True
-                break
-        checklist[item] = found
-    return checklist
+    result = {}
+    for section, patterns in MANDATORY_FRONT_MATTER.items():
+        found = any(
+            any(re.search(pat, p["content"], re.IGNORECASE) for pat in patterns)
+            for p in paragraphs
+        )
+        result[section] = found
+    return result
+
+
+def _extract_toc(paragraphs):
+    toc = []
+    in_toc = False
+    for p in paragraphs:
+        text = p["content"]
+        if not in_toc:
+            if re.search(r"kazalo vsebine", text, re.IGNORECASE):
+                in_toc = True
+            continue
+        if re.match(r"^[A-ZČŠŽ][^\.]{2,}$", text) and not re.search(r"\.{2,}", text):
+            break
+        m = re.match(r"^\s*(\d+(?:\.\d+)*)\.\s+(.*?)\s*\.{2,}\s*\d+", text)
+        if m:
+            toc.append({
+                "number": m.group(1),
+                "title": m.group(2).strip()
+            })
+    return toc
+
+
+def _extract_uvod(paragraphs):
+    uvod = []
+    in_sec = False
+    for p in paragraphs:
+        c = p["content"]
+        if re.match(r"^\d+\.\s+UVOD", c, re.IGNORECASE) or c.strip().upper() == "UVOD":
+            in_sec = True
+            continue
+        if in_sec and re.match(r"^\d+\.\s+", c):
+            break
+        if in_sec:
+            uvod.append(c)
+    return uvod
