@@ -214,8 +214,35 @@ def _extract_toc(paragraphs):
 import re
 
 def _apply_toc_styles(paragraphs, toc):
-    # Remove standalone page-number paragraphs (digits only)
+    # Merge broken reference entries: combine paragraphs starting with [n] and their continuations
+    merged = []
+    ref_re = re.compile(r"^\[\d+\]")
+    curr = None
+    for p in paragraphs:
+        txt = p['content']
+        if ref_re.match(txt):
+            # starting a new reference
+            if curr is not None:
+                merged.append(curr)
+            curr = p.copy()
+        else:
+            # continuation of a reference if curr exists
+            if curr is not None:
+                curr['content'] = curr['content'] + ' ' + txt
+            else:
+                merged.append(p)
+    if curr is not None:
+        merged.append(curr)
+    paragraphs = merged
+
+    # 1) Remove standalone page-number paragraphs (digits only)
     paragraphs = [p for p in paragraphs if not re.fullmatch(r"\d+", p["content"].strip())]
+
+    # 2) Classify figure/table entries as captions
+    label_re = re.compile(r"^(Slika|Tabela)\s*\d+:", re.IGNORECASE)
+    for p in paragraphs:
+        if label_re.match(p["content"]):
+            p["style"] = "Caption"
 
     # Build lookup: (number, title) → level
     level_map = {
@@ -223,7 +250,7 @@ def _apply_toc_styles(paragraphs, toc):
         for entry in toc
     }
 
-    # 1) ToC-style entries: require dot leaders and a page number
+    # 3) ToC-style entries: require dot leaders and a page number
     head_re = re.compile(r"""
         ^\s*
         (?P<num>\d+(?:\.\d+)*)      # 1 or 1.2 or 2.3.4
@@ -232,7 +259,7 @@ def _apply_toc_styles(paragraphs, toc):
         \s*\.{2,}\s*\d+\s*$       # at least two dots + page number
     """, re.VERBOSE)
 
-    # 2) Simple numbered prefix: match numeric sections
+    # 4) Simple numbered prefix: match numeric sections
     simple_re = re.compile(r"""
         ^\s*
         (?P<num>\d+(?:\.\d+)*)     # e.g. 3 or 4.2 etc.
@@ -244,9 +271,14 @@ def _apply_toc_styles(paragraphs, toc):
 
     styled = []
     for p in paragraphs:
+        # Skip captions
+        if p.get("style") == "Caption":
+            styled.append(p)
+            continue
+
         txt = p["content"]
 
-        # 1. ToC-style entries get headings
+        # 3. ToC-style headings
         m = head_re.match(txt)
         if m:
             num = m.group("num")
@@ -254,20 +286,17 @@ def _apply_toc_styles(paragraphs, toc):
             lvl = level_map.get((num, title), num.count('.') + 1)
             p["style"] = f"Heading {lvl}"
         else:
-            # 2. Fallback: simple numbered or uppercase-based headings
+            # 4. Fallback: numeric or uppercase-based headings
             m2 = simple_re.match(txt)
             if m2:
                 num = m2.group("num")
                 title = m2.group("title").strip()
-                # Use ToC level if available
                 if (num, title) in level_map:
                     lvl = level_map[(num, title)]
                     p["style"] = f"Heading {lvl}"
-                # Uppercase titles for headings
                 elif title.upper() == title:
                     lvl = num.count('.') + 1
                     p["style"] = f"Heading {lvl}"
-                # Nested numeric sections (>= 3rd level)
                 elif num.count('.') >= 2:
                     lvl = num.count('.') + 1
                     p["style"] = f"Heading {lvl}"
