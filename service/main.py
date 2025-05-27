@@ -1,12 +1,14 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
 import uuid, io, tempfile, os, re, requests
 from docx import Document
 from pdf2docx import Converter
 from dotenv import load_dotenv
 from pathlib import Path
+import re
 
-
+# Load environment variables
 root = Path(__file__).resolve().parent.parent
 env_path = root / ".env.local"
 load_dotenv(dotenv_path=env_path)
@@ -15,9 +17,17 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 if not GEMINI_API_KEY:
     raise RuntimeError("Please set GEMINI_API_KEY in your .env.local")
 
-
+# Initialize FastAPI with CORS
 app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
+# Mandatory front-matter sections and their matching patterns
 MANDATORY_FRONT_MATTER = {
     "Naslovna stran": [r"naslov", r"studenta", r"program"],
     "Zahvala": [r"zahvala"],
@@ -57,7 +67,6 @@ def index():
 </body></html>
 """
 
-
 @app.post("/upload-docx")
 async def upload_docx(file: UploadFile = File(...)):
     if not file.filename.lower().endswith(".docx"):
@@ -69,8 +78,9 @@ async def upload_docx(file: UploadFile = File(...)):
         raise HTTPException(400, f"Error reading DOCX: {e}")
 
     paragraphs = _extract_paragraphs(doc)
-    front = _check_front_matter(paragraphs)
     toc = _extract_toc(paragraphs)
+    paragraphs = _apply_toc_styles(paragraphs, toc)
+    front = _check_front_matter(paragraphs)
     uvod = _extract_uvod(paragraphs)
 
     return JSONResponse({
@@ -106,8 +116,9 @@ async def upload_pdf(file: UploadFile = File(...)):
         os.unlink(docx_path)
 
     paragraphs = _extract_paragraphs(doc)
-    front = _check_front_matter(paragraphs)
     toc = _extract_toc(paragraphs)
+    paragraphs = _apply_toc_styles(paragraphs, toc)
+    front = _check_front_matter(paragraphs)
     uvod = _extract_uvod(paragraphs)
 
     return JSONResponse({
@@ -123,23 +134,15 @@ def ai_check():
         "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
         f"?key={GEMINI_API_KEY}"
     )
-    body = {
-"contents": [
-    {"parts": [{"text": """Uvod mora biti napisan po teh navodilih: Prvi odstavek uvoda se začne s kratko predstavitvijo širšega in zatem ožjega področja. Navedite, zakaj je pomembno. V drugem odstavku opišite problem in raziskovalna vprašanja oz. cilje.  V tretjem odstavku navedite, kaj boste naredili v projektu v zvezi z zastavljenimi raziskovalnimi vprašanji oz. cilji. Četrti odstavek vključuje kratko napoved vsebine nadaljnjih poglavij. 
-                Uvod ima samo te štiri odstavke in naj bo dolg stran ali dve. Naj ne bo razdeljen na podpoglavja. Pandemija COVID-19 je leta 2020 močno preoblikovala način dela v številnih panogah, še posebej v sektorju informacijske tehnologije (IT). Čez noč so se morala podjetja prilagoditi delu na daljavo, kar je pomenilo velik preskok v načinu vodenja projektov in vključevanja ekip. Delo od doma je postalo “nova resničnost” za milijone delavcev po svetu, projektni vodje pa so se znašli pred izzivom, kako na daljavo učinkovito voditi projekte in hkrati ohranjati povezane in motivirane delovne skupine. V IT sektorju, kjer so ekipe pogosto geografsko razpršene in so projekti kompleksni, je razvoj dobrih praks za vodenje na daljavo ključnega pomena.
-V tej raziskovalni projektni nalogi se osredotočamo na dobre prakse vključevanja in vodenja projektov na daljavo v obdobju po letu 2020, s poudarkom na vlogi vodij projektov v IT. Posebej nas zanimajo spremembe, ki sta jih sprožili pandemija in pospešena digitalizacija, ter kako so uspešna podjetja to izkoristila v svoj prid. Raziskali bomo teoretsko ozadje fenomena dela na daljavo, identificirali izzive ter predstavili učinkovite pristope in metode za vodenje razpršenih ekip. Pri tem bomo uporabili primere znanih podjetij, kot so GitLab, Zapier in Atlassian, ki veljajo za pionirje oziroma zgledne primere oddaljenega dela v industriji. 
-                Your writing style should be concise, direct, friendly, and sound like a real human quickly dashing off a note
-                Give me feedback about my uvod, please do not write your version but give me feedback on what to improve, no examples please
-"""} ]}
-        ]
-    }
-    resp = requests.post(url, json=body, headers={"Content-Type": "application/json"})
+    body = {"contents":[{"parts":[{"text":"..."}]}]}
+    resp = requests.post(url, json=body, headers={"Content-Type":"application/json"})
     if not resp.ok:
         raise HTTPException(resp.status_code, f"Gemini API error: {resp.text}")
     data = resp.json()
     text = data.get("candidates", [{}])[0].get("content", "")
     return JSONResponse({"ai_response": text})
 
+# Helper functions
 
 def _extract_paragraphs(doc: Document):
     out = []
@@ -168,28 +171,116 @@ def _check_front_matter(paragraphs):
 def _extract_toc(paragraphs):
     toc = []
     in_toc = False
+
+    # Match either “1.2.” or “1.2␣” before the title
+    entry_re = re.compile(r"""
+        ^\s*
+        (?P<num>\d+(?:\.\d+)*)        # 1, 1.1, 1.2, etc.
+        (?:\.)?[\s\t]+                # optional dot, then space or tab
+        (?P<title>.*?)                # heading text
+        \s*\.{2,}\s*                  # at least two dots before page#
+        (?P<page>\d+)\s*$             # page number
+    """, re.VERBOSE)
+
+    # Stop as soon as we hit the next index (e.g. “Kazalo slik”, “Priloge”…)
+    end_sections = re.compile(
+        r"^(kazalo slik|kazalo tabel|seznam virov|priloge)",
+        re.IGNORECASE
+    )
+
     for p in paragraphs:
-        text = p["content"]
+        txt = p["content"]
         if not in_toc:
-            if re.search(r"kazalo vsebine", text, re.IGNORECASE):
+            if re.search(r"kazalo vsebine", txt, re.IGNORECASE):
                 in_toc = True
             continue
-        if re.match(r"^[A-ZČŠŽ][^\.]{2,}$", text) and not re.search(r"\.{2,}", text):
+
+        if end_sections.match(txt):
             break
-        m = re.match(r"^\s*(\d+(?:\.\d+)*)\.\s+(.*?)\s*\.{2,}\s*\d+", text)
+
+        m = entry_re.match(txt)
         if m:
+            num   = m.group("num")
+            level = num.count('.') + 1
             toc.append({
-                "number": m.group(1),
-                "title": m.group(2).strip()
+                "number": num,
+                "title":  m.group("title").strip(),
+                "level":  level
             })
+
     return toc
 
+
+import re
+
+def _apply_toc_styles(paragraphs, toc):
+    # Remove standalone page-number paragraphs (digits only)
+    paragraphs = [p for p in paragraphs if not re.fullmatch(r"\d+", p["content"].strip())]
+
+    # Build lookup: (number, title) → level
+    level_map = {
+        (entry["number"], entry["title"]): entry["level"]
+        for entry in toc
+    }
+
+    # 1) ToC-style entries: require dot leaders and a page number
+    head_re = re.compile(r"""
+        ^\s*
+        (?P<num>\d+(?:\.\d+)*)      # 1 or 1.2 or 2.3.4
+        \.?\s+                       # optional dot, then at least one space
+        (?P<title>.*?)                # heading text
+        \s*\.{2,}\s*\d+\s*$       # at least two dots + page number
+    """, re.VERBOSE)
+
+    # 2) Simple numbered prefix: match numeric sections
+    simple_re = re.compile(r"""
+        ^\s*
+        (?P<num>\d+(?:\.\d+)*)     # e.g. 3 or 4.2 etc.
+        \.?                           # optional trailing dot
+        (?=[^\.\s])                  # next char not dot/space
+        (?P<title>.+)                  # the rest of the line
+        $
+    """, re.VERBOSE)
+
+    styled = []
+    for p in paragraphs:
+        txt = p["content"]
+
+        # 1. ToC-style entries get headings
+        m = head_re.match(txt)
+        if m:
+            num = m.group("num")
+            title = m.group("title").strip()
+            lvl = level_map.get((num, title), num.count('.') + 1)
+            p["style"] = f"Heading {lvl}"
+        else:
+            # 2. Fallback: simple numbered or uppercase-based headings
+            m2 = simple_re.match(txt)
+            if m2:
+                num = m2.group("num")
+                title = m2.group("title").strip()
+                # Use ToC level if available
+                if (num, title) in level_map:
+                    lvl = level_map[(num, title)]
+                    p["style"] = f"Heading {lvl}"
+                # Uppercase titles for headings
+                elif title.upper() == title:
+                    lvl = num.count('.') + 1
+                    p["style"] = f"Heading {lvl}"
+                # Nested numeric sections (>= 3rd level)
+                elif num.count('.') >= 2:
+                    lvl = num.count('.') + 1
+                    p["style"] = f"Heading {lvl}"
+
+        styled.append(p)
+
+    return styled
 
 def _extract_uvod(paragraphs):
     uvod = []
     in_sec = False
     for p in paragraphs:
-        c = p["content"]
+        c = p['content']
         if re.match(r"^\d+\.\s+UVOD", c, re.IGNORECASE) or c.strip().upper() == "UVOD":
             in_sec = True
             continue
