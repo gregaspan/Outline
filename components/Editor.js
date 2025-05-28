@@ -5,100 +5,57 @@ import { v4 as uuidv4 } from "uuid";
 import { Heading1, Heading2, MoreHorizontal } from "lucide-react";
 import BlockMenu from "./BlockMenu";
 import { cn } from "../libs/utils";
-
-// Base URL of your FastAPI backend
-const API_BASE = "http://127.0.0.1:8000";
-
-// Component: DocumentUploader
-export function DocumentUploader({ onResult }) {
-  const [error, setError] = useState(null);
-
-  const handleFile = async (e) => {
-    setError(null);
-    const file = e.target.files[0];
-    if (!file) return;
-    const form = new FormData();
-    form.append("file", file);
-    const isPDF = file.name.toLowerCase().endsWith(".pdf");
-    const endpoint = isPDF ? "/upload-pdf" : "/upload-docx";
-
-    try {
-      const res = await fetch(`${API_BASE}${endpoint}`, {
-        method: "POST",
-        body: form,
-      });
-      if (!res.ok) {
-        const txt = await res.text();
-        throw new Error(txt);
-      }
-      const json = await res.json();
-      onResult({ ...json, isPDF });
-    } catch (e) {
-      setError(e.message);
-    }
-  };
-
-  return (
-    <div className="mb-6">
-      <input
-        type="file"
-        accept=".pdf,.docx"
-        onChange={handleFile}
-        className="mb-2"
-      />
-      {error && <div className="text-red-600">Error: {error}</div>}
-    </div>
-  );
-}
+import DocumentUploader from "./DocumentUploader";
+import ResultSummary from "./ResultSummary";
 
 // Utility: map Word styles to our block types
 function mapStyleToType(style) {
   const s = style.toLowerCase();
-  if (s.includes("heading 1") || s === "heading 1") return "heading-1";
-  if (s.includes("heading 2") || s === "heading 2") return "heading-2";
-  if (s.includes("heading 3") || s === "heading 3") return "heading-3";
+  if (s.includes("heading 1")) return "heading-1";
+  if (s.includes("heading 2")) return "heading-2";
+  if (s.includes("heading 3")) return "heading-3";
   if (s.includes("caption")) return "caption";
   return "paragraph";
 }
 
 // Utility: derive block type from TOC number
 function tocTypeFromNumber(number) {
-  const level = number.split('.').length;
-  if (level === 1) return 'heading-1';
-  if (level === 2) return 'heading-2';
-  return 'heading-3';
+  const level = number.split(".").length;
+  if (level === 1) return "heading-1";
+  if (level === 2) return "heading-2";
+  return "heading-3";
 }
 
-// Component: Editor
 export default function Editor() {
-  const [blocks, setBlocks] = useState([
-    { id: uuidv4(), type: "paragraph", content: "Paragraph" },
-  ]);
+  const [uploadResult, setUploadResult] = useState(null);
+  const [blocks, setBlocks] = useState([]);
   const [title, setTitle] = useState("Naslov");
   const [currentBlockId, setCurrentBlockId] = useState(null);
   const [showBlockMenu, setShowBlockMenu] = useState(false);
   const [blockMenuPos, setBlockMenuPos] = useState({ top: 0, left: 0 });
   const [menuFilter, setMenuFilter] = useState("");
   const refs = useRef({});
-  const [uploadResult, setUploadResult] = useState(null);
 
-  // Replace blocks on document upload, preserving styles or using TOC for PDF
+  // On upload, import paragraphs into editable blocks
   useEffect(() => {
     if (!uploadResult) return;
-    const { paragraphs, table_of_contents = [], isPDF } = uploadResult;
+    const { paragraphs, table_of_contents = [] } = uploadResult;
+    const isPDF = table_of_contents.length > 0;
     const imported = paragraphs.map((p) => {
       let type = mapStyleToType(p.style);
       let content = p.content;
-      if (isPDF && table_of_contents.length) {
-        // Try to match TOC entry
-        const match = table_of_contents.find(({ number, title }) => {
-          const text = p.content.trim();
-          return text === title || text.startsWith(number + ' ');
-        });
+      if (isPDF) {
+        const match = table_of_contents.find(
+          ({ number, title }) =>
+            p.content.trim() === title ||
+            p.content.trim().startsWith(number + " ")
+        );
         if (match) {
           type = tocTypeFromNumber(match.number);
-          // strip leading number from content
-          content = content.replace(new RegExp(`^${match.number}\s*`), '').trim();
+          content = content.replace(
+            new RegExp(`^${match.number}\\s*`),
+            ""
+          ).trim();
         }
       }
       return { id: p.id, type, content };
@@ -107,9 +64,12 @@ export default function Editor() {
   }, [uploadResult]);
 
   const handleTitleChange = (e) => setTitle(e.target.value);
+
   const handleBlockChange = (id, e) => {
     const content = e.currentTarget.textContent || "";
-    setBlocks(blocks.map((b) => (b.id === id ? { ...b, content } : b)));
+    setBlocks(blocks.map((b) =>
+      b.id === id ? { ...b, content } : b
+    ));
   };
 
   const addBlockAfter = (id, type = "paragraph") => {
@@ -123,8 +83,10 @@ export default function Editor() {
   };
 
   const deleteBlock = (id) => {
-    if (blocks.length === 1)
-      return setBlocks([{ id: blocks[0].id, type: "paragraph", content: "" }]);
+    if (blocks.length === 1) {
+      setBlocks([{ ...blocks[0], content: "" }]);
+      return;
+    }
     const idx = blocks.findIndex((b) => b.id === id);
     const newBlocks = blocks.filter((b) => b.id !== id);
     setBlocks(newBlocks);
@@ -135,7 +97,9 @@ export default function Editor() {
   };
 
   const changeBlockType = (id, newType) => {
-    setBlocks(blocks.map((b) => (b.id === id ? { ...b, type: newType } : b)));
+    setBlocks(blocks.map((b) =>
+      b.id === id ? { ...b, type: newType } : b
+    ));
     setShowBlockMenu(false);
   };
 
@@ -181,6 +145,7 @@ export default function Editor() {
     setMenuFilter("");
   };
 
+  // Close block menu on outside click
   useEffect(() => {
     const handler = (e) => {
       const el = currentBlockId ? refs.current[currentBlockId] : null;
@@ -192,6 +157,7 @@ export default function Editor() {
     return () => document.removeEventListener("click", handler);
   }, [currentBlockId]);
 
+  // Render a single block
   const renderBlock = (block) => {
     const common = {
       ref: (el) => (refs.current[block.id] = el),
@@ -226,13 +192,24 @@ export default function Editor() {
           </div>
         );
       default:
-        return <p {...common} className="outline-none">{block.content}</p>;
+        return (
+          <p {...common} className="outline-none">
+            {block.content}
+          </p>
+        );
     }
   };
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8">
       <DocumentUploader onResult={setUploadResult} />
+
+      {uploadResult && (
+        <ResultSummary
+          frontMatter={uploadResult.front_matter_found}
+          bodySections={uploadResult.body_sections_found}
+        />
+      )}
 
       <input
         type="text"
@@ -250,9 +227,7 @@ export default function Editor() {
                 <MoreHorizontal className="h-4 w-4" />
               </button>
               <ul tabIndex="0" className="dropdown-content menu p-2 shadow bg-base-100 rounded-box w-52">
-                <li>
-                  <button onClick={() => changeBlockType(block.id, "paragraph")}>¶ Text</button>
-                </li>
+                <li><button onClick={() => changeBlockType(block.id, "paragraph")}>¶ Text</button></li>
                 <li>
                   <button onClick={() => changeBlockType(block.id, "heading-1")}>
                     <Heading1 className="mr-2 h-4 w-4" /> H1
