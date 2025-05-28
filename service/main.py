@@ -133,7 +133,7 @@ def _process_document(doc: Document):
     # 2. Style special sections
     styled = _style_special_sections(paragraphs)
 
-    # 3. Remove all TOC sections
+    # 3. Remove all TOC sections (basic TOC skip based on title)
     filtered = []
     skip = False
     for p in styled:
@@ -159,7 +159,10 @@ def _process_document(doc: Document):
     toc        = _extract_toc(filtered)
     final_para = _apply_toc_styles(filtered, toc)
 
-    # 6. Trim everything before "Zahvala" and remove unwanted lines
+    # 6. Remove numbered TOC entries with dot leaders and page numbers
+    final_para = _filter_out_toc_entries(final_para)
+
+    # 7. Trim everything before "Zahvala" and remove unwanted lines
     output_para = []
     saw_zahvala = False
     for p in final_para:
@@ -192,7 +195,12 @@ def _process_document(doc: Document):
         "missing_body_sections": missing_body
     })
 
+
 # --- Helper functions ---
+
+def _filter_out_toc_entries(paragraphs):
+    toc_line_re = re.compile(r"^\s*\d+(\.\d+)*\.?\s+.+?\.{2,}\s*\d+\s*$")
+    return [p for p in paragraphs if not toc_line_re.match(p["content"])]
 
 def _extract_paragraphs(doc: Document):
     out = []
