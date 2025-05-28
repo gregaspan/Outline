@@ -37,6 +37,12 @@ export default function Editor() {
     const [menuFilter, setMenuFilter] = useState("");
     const refs = useRef({});
 
+    useEffect(() => {
+        if (uploadResult?.notranja_naslovna?.title) {
+            setTitle(uploadResult.notranja_naslovna.title);
+        }
+    }, [uploadResult]);
+
     // Import paragraphs into blocks on upload
     useEffect(() => {
         if (!uploadResult) return;
@@ -199,13 +205,8 @@ export default function Editor() {
             )}
 
             {/* Title */}
-            <input
-                type="text"
-                value={title}
-                onChange={handleTitleChange}
-                placeholder="Naslov zaključnega dela"
-                className="w-full text-4xl font-bold mb-6 outline-none border-none"
-            />
+            <h1 className="text-3xl font-bold mt-6 mb-2 outline-none">{title}</h1>
+
 
             {/* Editor Blocks */}
             <div className="space-y-3">
