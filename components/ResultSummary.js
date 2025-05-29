@@ -60,7 +60,7 @@ const ResultSummary = ({ frontMatter, bodySections }) => {
                     </span>
                     {isMarkedAsFound && (
                         <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">
-                            Označeno kot najdeno oz. nepotrebno
+                            Najdeno/nepotrebno
                         </span>
                     )}
                 </div>
