@@ -164,7 +164,7 @@ export default function Editor() {
 Chapter content:
 ${formattedContent}
 
-Please provide 1-3 specific, actionable suggestions for improvement - do not write anything else. Write in slovenian language. Only format the text using break lines, no other formatting. Do not try to make any text bold or italic.`,
+Please provide 1-3 specific, actionable suggestions for improvement - do not write anything else. Write in slovenian language. Only format the text using break lines - add one after each suggestion, no other formatting. Do not try to make any text bold or italic.`,
                         }]
                     }],
                     generationConfig: {

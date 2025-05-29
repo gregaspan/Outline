@@ -12,8 +12,6 @@ env_path = root / ".env.local"
 load_dotenv(dotenv_path=env_path)
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-if not GEMINI_API_KEY:
-    raise RuntimeError("Please set GEMINI_API_KEY in your .env.local")
 
 app = FastAPI()
 app.add_middleware(
@@ -185,6 +183,9 @@ def _process_document(doc: Document):
 
         output_para.append(p)
 
+    # 8. Calculate enhanced metrics
+    structure_analysis = _calculate_structure_metrics(front, body, uvod)
+
     return JSONResponse({
         "notranja_naslovna": notranja,
         "paragraphs": output_para,
@@ -192,11 +193,71 @@ def _process_document(doc: Document):
         "missing_sections": missing_front,
         "uvod": uvod,
         "body_sections_found": body,
-        "missing_body_sections": missing_body
+        "missing_body_sections": missing_body,
+        "table_of_contents": toc,
+        "structure_analysis": structure_analysis
     })
 
 
 # --- Helper functions ---
+
+def _calculate_structure_metrics(front_matter, body_sections, uvod):
+    """Calculate comprehensive structure analysis metrics"""
+    total_sections = len(front_matter) + len(body_sections)
+    found_sections = sum(front_matter.values()) + sum(body_sections.values())
+    
+    # Base score
+    base_score = (found_sections / total_sections) * 100 if total_sections > 0 else 0
+    
+    # Bonus points for well-structured introduction
+    uvod_bonus = 0
+    if uvod and len(uvod) > 0:
+        uvod_text = ' '.join(uvod).lower()
+        subsection_matches = sum(1 for pattern in SUBSECTION_PATTERNS 
+                               if re.search(pattern, uvod_text, re.IGNORECASE))
+        if subsection_matches >= 2:
+            uvod_bonus = 5
+        elif subsection_matches >= 1:
+            uvod_bonus = 2
+    
+    # Critical sections penalty
+    critical_sections = ["Povzetek SI", "Povzetek EN", "Uvod", "Zaključek"]
+    missing_critical = sum(1 for section in critical_sections 
+                          if section in {**front_matter, **body_sections} 
+                          and not {**front_matter, **body_sections}[section])
+    critical_penalty = missing_critical * 5
+    
+    final_score = max(0, min(100, base_score + uvod_bonus - critical_penalty))
+    
+    return {
+        "overall_score": round(final_score),
+        "total_sections": total_sections,
+        "found_sections": found_sections,
+        "missing_critical": missing_critical,
+        "uvod_quality": len(uvod) if uvod else 0,
+        "recommendations": _generate_recommendations(found_sections, total_sections, missing_critical, uvod)
+    }
+
+def _generate_recommendations(found, total, missing_critical, uvod):
+    """Generate specific recommendations for improvement"""
+    recommendations = []
+    
+    completion_rate = (found / total) * 100 if total > 0 else 0
+    
+    if completion_rate < 70:
+        recommendations.append("Struktura potrebuje večje popravke - manjka več kot 30% obveznih elementov.")
+    elif completion_rate < 90:
+        recommendations.append("Struktura je dobra, vendar bi lahko dodali manjkajoče elemente.")
+    else:
+        recommendations.append("Odlična struktura dokumenta!")
+    
+    if missing_critical > 0:
+        recommendations.append(f"Manjka {missing_critical} kritičnih sekcij (povzetek, uvod, zaključek).")
+    
+    if not uvod or len(uvod) < 3:
+        recommendations.append("Uvod je prekratek ali manjka - priporoča se razširitev.")
+    
+    return recommendations
 
 def _filter_out_toc_entries(paragraphs):
     toc_line_re = re.compile(r"^\s*\d+(\.\d+)*\.?\s+.+?\.{2,}\s*\d+\s*$")
