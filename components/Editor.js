@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { v4 as uuidv4 } from "uuid";
-import { Heading1, Heading2, MoreHorizontal, ChevronRight, ChevronDown, Sparkles, Copy, Clipboard, Brain } from "lucide-react";
+import { Heading1, Heading2, MoreHorizontal, ChevronRight, ChevronDown, Sparkles, Copy, Clipboard, Brain, Volume2, VolumeX } from "lucide-react";
 import BlockMenu from "./BlockMenu";
 import { cn } from "../libs/utils";
 import DocumentUploader from "./DocumentUploader";
@@ -65,6 +65,10 @@ export default function Editor() {
     const [showContextMenu, setShowContextMenu] = useState(false);
     const [contextMenuPos, setContextMenuPos] = useState({ x: 0, y: 0 });
 
+    const [currentAudio, setCurrentAudio] = useState(null);
+    const [playingBlockId, setPlayingBlockId] = useState(null);
+    const [loadingTTS, setLoadingTTS] = useState(new Set());
+
     const refs = useRef({});
 
     useEffect(() => {
@@ -73,35 +77,35 @@ export default function Editor() {
         }
     }, [uploadResult]);
 
-// Handle text selection and context menu
-useEffect(() => {
-    const handleTextSelection = () => {
-        const selection = window.getSelection();
-        const text = selection.toString().trim();
+    // Handle text selection and context menu
+    useEffect(() => {
+        const handleTextSelection = () => {
+            const selection = window.getSelection();
+            const text = selection.toString().trim();
 
-        if (text && text.length > 0) {
-            setSelectedText(text);
-            
-            const range = selection.getRangeAt(0);
-            const rect = range.getBoundingClientRect();
-            const x = rect.left + rect.width / 2;
-            const y = rect.top;
-            
-            setContextMenuPos({ x, y });
-            setShowContextMenu(true);
-        } else {
-            setShowContextMenu(false);
-        }
-    };
+            if (text && text.length > 0) {
+                setSelectedText(text);
+                
+                const range = selection.getRangeAt(0);
+                const rect = range.getBoundingClientRect();
+                const x = rect.left + rect.width / 2;
+                const y = rect.top;
+                
+                setContextMenuPos({ x, y });
+                setShowContextMenu(true);
+            } else {
+                setShowContextMenu(false);
+            }
+        };
 
-    document.addEventListener("mouseup", handleTextSelection);
-    document.addEventListener("touchend", handleTextSelection);
+        document.addEventListener("mouseup", handleTextSelection);
+        document.addEventListener("touchend", handleTextSelection);
 
-    return () => {
-        document.removeEventListener("mouseup", handleTextSelection);
-        document.removeEventListener("touchend", handleTextSelection);
-    };
-}, []);
+        return () => {
+            document.removeEventListener("mouseup", handleTextSelection);
+            document.removeEventListener("touchend", handleTextSelection);
+        };
+    }, []);
 
     // Import paragraphs into blocks on upload
     useEffect(() => {
@@ -128,6 +132,88 @@ useEffect(() => {
         });
         setBlocks(imported);
     }, [uploadResult]);
+
+    // TTS Functions
+    const synthesizeSpeech = async (text, blockId) => {
+        if (!text.trim()) return;
+
+        setLoadingTTS(prev => new Set([...prev, blockId]));
+
+        try {
+            const response = await fetch('/api/tts', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    text: text,
+                    voice_id: process.env.NEXT_PUBLIC_ELEVENLABS_VOICE_ID || 'pNInz6obpgDQGcFmaJgB', // Default voice
+                }),
+            });
+
+            if (!response.ok) {
+                throw new Error(`TTS API request failed: ${response.status}`);
+            }
+
+            const audioBlob = await response.blob();
+            const audioUrl = URL.createObjectURL(audioBlob);
+            const audio = new Audio(audioUrl);
+
+            // Stop current audio if playing
+            if (currentAudio) {
+                currentAudio.pause();
+                currentAudio.currentTime = 0;
+            }
+
+            setCurrentAudio(audio);
+            setPlayingBlockId(blockId);
+
+            audio.onended = () => {
+                setPlayingBlockId(null);
+                setCurrentAudio(null);
+                URL.revokeObjectURL(audioUrl);
+            };
+
+            audio.onerror = () => {
+                console.error('Audio playback error');
+                setPlayingBlockId(null);
+                setCurrentAudio(null);
+                URL.revokeObjectURL(audioUrl);
+            };
+
+            await audio.play();
+
+        } catch (error) {
+            console.error('TTS Error:', error);
+            alert('Error generating speech. Please check your ElevenLabs API configuration.');
+        } finally {
+            setLoadingTTS(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(blockId);
+                return newSet;
+            });
+        }
+    };
+
+    const stopSpeech = () => {
+        if (currentAudio) {
+            currentAudio.pause();
+            currentAudio.currentTime = 0;
+            setPlayingBlockId(null);
+            setCurrentAudio(null);
+        }
+    };
+
+    const handleTTS = (blockId) => {
+        const block = blocks.find(b => b.id === blockId);
+        if (!block || !block.content.trim()) return;
+
+        if (playingBlockId === blockId) {
+            stopSpeech();
+        } else {
+            synthesizeSpeech(block.content, blockId);
+        }
+    };
 
     const handleCopy = async () => {
         try {
@@ -363,6 +449,11 @@ Please provide 1-3 specific, actionable suggestions for improvement - do not wri
             return newSet;
         });
 
+        // Stop TTS if this block was playing
+        if (playingBlockId === id) {
+            stopSpeech();
+        }
+
         setTimeout(() => {
             const focusBlock = newBlocks[Math.max(0, idx - 1)];
             refs.current[focusBlock.id]?.focus();
@@ -472,6 +563,27 @@ Please provide 1-3 specific, actionable suggestions for improvement - do not wri
                 <div className="w-6 mr-2 flex-shrink-0" />
             ) : null;
 
+        // TTS button for all blocks with content
+        const ttsButton = block.content?.trim() ? (
+            <button
+                onClick={(e) => {
+                    e.preventDefault();
+                    handleTTS(block.id);
+                }}
+                disabled={loadingTTS.has(block.id)}
+                className="flex-shrink-0 ml-2 p-1 hover:bg-green-50 rounded transition-colors group/tts"
+                title={playingBlockId === block.id ? "Stop speech" : "Read aloud"}
+            >
+                {loadingTTS.has(block.id) ? (
+                    <div className="animate-spin h-4 w-4 border-2 border-green-500 border-t-transparent rounded-full"></div>
+                ) : playingBlockId === block.id ? (
+                    <VolumeX className="h-4 w-4 text-red-500 group-hover/tts:text-red-600 transition-colors" />
+                ) : (
+                    <Volume2 className="h-4 w-4 text-gray-400 group-hover/tts:text-green-500 transition-colors" />
+                )}
+            </button>
+        ) : null;
+
         const suggestButton = isHeadingBlock ? (
             <button
                 onClick={(e) => {
@@ -496,8 +608,20 @@ Please provide 1-3 specific, actionable suggestions for improvement - do not wri
                 <div {...common} className="flex-1 outline-none">
                     {content}
                 </div>
-                <div className="opacity-0 group-hover/heading:opacity-100 transition-opacity">
+                <div className="opacity-0 group-hover/heading:opacity-100 transition-opacity flex items-center">
+                    {ttsButton}
                     {suggestButton}
+                </div>
+            </div>
+        );
+
+        const regularContent = (content, className = "") => (
+            <div className="flex items-start w-full group/block">
+                <div {...common} className={`flex-1 outline-none ${className}`}>
+                    {content}
+                </div>
+                <div className="opacity-0 group-hover/block:opacity-100 transition-opacity flex items-center ml-2">
+                    {ttsButton}
                 </div>
             </div>
         );
@@ -523,17 +647,14 @@ Please provide 1-3 specific, actionable suggestions for improvement - do not wri
                 );
             case "caption":
                 return (
-                    <div
-                        {...common}
-                        className="text-sm italic text-gray-500 mt-2 mb-4 outline-none"
-                    >
-                        {block.content}
+                    <div className="text-sm italic text-gray-500 mt-2 mb-4">
+                        {regularContent(block.content)}
                     </div>
                 );
             default:
                 return (
-                    <p {...common} className="outline-none">
-                        {block.content}
+                    <p>
+                        {regularContent(block.content)}
                     </p>
                 );
         }
