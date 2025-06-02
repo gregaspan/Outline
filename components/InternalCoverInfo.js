@@ -15,7 +15,6 @@ export default function InternalCoverInfo({ info }) {
     lektor,
   } = info;
 
-  // Helper function to get appropriate icon for each field
   const getIcon = (field) => {
     switch (field) {
       case 'title':
@@ -39,7 +38,6 @@ export default function InternalCoverInfo({ info }) {
     }
   };
 
-  // Helper function to get field labels
   const getLabel = (field) => {
     const labels = {
       title: 'Naslov dela',
@@ -54,7 +52,6 @@ export default function InternalCoverInfo({ info }) {
     return labels[field] || field;
   };
 
-  // Create an array of field objects for easier rendering (excluding title)
   const fields = [
     { key: 'type', value: type },
     { key: 'student', value: student },
@@ -67,7 +64,6 @@ export default function InternalCoverInfo({ info }) {
 
   return (
     <div className="relative overflow-hidden bg-gradient-to-br from-slate-50 via-white to-blue-50 border border-slate-200 rounded-2xl shadow-xl mb-8">
-      {/* Decorative background elements */}
       <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full opacity-30 -translate-y-16 translate-x-16"></div>
       <div className="absolute bottom-0 left-0 w-24 h-24 bg-gradient-to-tr from-green-100 to-teal-100 rounded-full opacity-30 translate-y-12 -translate-x-12"></div>
       

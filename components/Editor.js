@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { v4 as uuidv4 } from "uuid";
-import { Heading1, Heading2, MoreHorizontal, ChevronRight, ChevronDown, Sparkles } from "lucide-react";
+import { Heading1, Heading2, MoreHorizontal, ChevronRight, ChevronDown, Sparkles, Copy, Clipboard, Brain } from "lucide-react";
 import BlockMenu from "./BlockMenu";
 import { cn } from "../libs/utils";
 import DocumentUploader from "./DocumentUploader";
@@ -59,9 +59,11 @@ export default function Editor() {
     const [loadingSuggestions, setLoadingSuggestions] = useState(new Set());
     const [suggestions, setSuggestions] = useState({});
 
-    // AI Consultant states lifted to aiconsultant.js
     const [selectedText, setSelectedText] = useState("");
     const [showConsultant, setShowConsultant] = useState(false);
+
+    const [showContextMenu, setShowContextMenu] = useState(false);
+    const [contextMenuPos, setContextMenuPos] = useState({ x: 0, y: 0 });
 
     const refs = useRef({});
 
@@ -71,26 +73,35 @@ export default function Editor() {
         }
     }, [uploadResult]);
 
-    // Handle text selection
-    useEffect(() => {
-        const handleTextSelection = () => {
-            const selection = window.getSelection();
-            const text = selection.toString().trim();
+// Handle text selection and context menu
+useEffect(() => {
+    const handleTextSelection = () => {
+        const selection = window.getSelection();
+        const text = selection.toString().trim();
 
-            if (text && text.length > 0) {
-                setSelectedText(text);
-                setShowConsultant(true);
-            }
-        };
+        if (text && text.length > 0) {
+            setSelectedText(text);
+            
+            const range = selection.getRangeAt(0);
+            const rect = range.getBoundingClientRect();
+            const x = rect.left + rect.width / 2;
+            const y = rect.top;
+            
+            setContextMenuPos({ x, y });
+            setShowContextMenu(true);
+        } else {
+            setShowContextMenu(false);
+        }
+    };
 
-        document.addEventListener("mouseup", handleTextSelection);
-        document.addEventListener("touchend", handleTextSelection);
+    document.addEventListener("mouseup", handleTextSelection);
+    document.addEventListener("touchend", handleTextSelection);
 
-        return () => {
-            document.removeEventListener("mouseup", handleTextSelection);
-            document.removeEventListener("touchend", handleTextSelection);
-        };
-    }, []);
+    return () => {
+        document.removeEventListener("mouseup", handleTextSelection);
+        document.removeEventListener("touchend", handleTextSelection);
+    };
+}, []);
 
     // Import paragraphs into blocks on upload
     useEffect(() => {
@@ -117,6 +128,30 @@ export default function Editor() {
         });
         setBlocks(imported);
     }, [uploadResult]);
+
+    const handleCopy = async () => {
+        try {
+            await navigator.clipboard.writeText(selectedText);
+            setShowContextMenu(false);
+        } catch (err) {
+            console.error('Failed to copy text: ', err);
+        }
+    };
+
+    const handlePaste = async () => {
+        try {
+            const text = await navigator.clipboard.readText();
+            document.execCommand('insertText', false, text);
+            setShowContextMenu(false);
+        } catch (err) {
+            console.error('Failed to paste text: ', err);
+        }
+    };
+
+    const handleAIConsultant = () => {
+        setShowContextMenu(false);
+        setShowConsultant(true);
+    };
 
     // Get content under a specific heading
     const getChapterContent = (headingId) => {
@@ -146,7 +181,6 @@ export default function Editor() {
         };
     };
 
-    // Suggest improvements using Gemini Flash 2.0
     const suggestImprovements = async (headingId) => {
         const chapterContent = getChapterContent(headingId);
         if (!chapterContent) return;
@@ -247,7 +281,6 @@ Please provide 1-3 specific, actionable suggestions for improvement - do not wri
         });
     };
 
-    // Get blocks that should be visible based on collapsed headings
     const getVisibleBlocks = () => {
         const visibleBlocks = [];
         let skipUntilLevel = null;
@@ -601,6 +634,42 @@ Please provide 1-3 specific, actionable suggestions for improvement - do not wri
                     </div>
                 ))}
             </div>
+
+            {/* Context Menu */}
+            {showContextMenu && (
+                <div
+                    className="fixed bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-50"
+                    style={{
+                        left: contextMenuPos.x,
+                        top: contextMenuPos.y,
+                        transform: 'translate(-50%, -100%)'
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <button
+                        onClick={handleCopy}
+                        className="flex items-center w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                    >
+                        <Copy className="h-4 w-4 mr-2" />
+                        Kopiraj
+                    </button>
+                    <button
+                        onClick={handlePaste}
+                        className="flex items-center w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                    >
+                        <Clipboard className="h-4 w-4 mr-2" />
+                        Prilepi
+                    </button>
+                    <hr className="my-1 border-gray-200" />
+                    <button
+                        onClick={handleAIConsultant}
+                        className="flex items-center w-full px-3 py-2 text-sm text-blue-700 hover:bg-blue-50 transition-colors"
+                    >
+                        <Brain className="h-4 w-4 mr-2" />
+                        AI Svetovalec
+                    </button>
+                </div>
+            )}
 
             {/* Block Insert Menu */}
             {showBlockMenu && (
