@@ -1,5 +1,7 @@
 import ButtonAccount from "@/components/ButtonAccount";
 import NotionEditor from "@/components/Editor";
+import Generator from "@/components/Generator";
+
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +14,7 @@ export default async function Dashboard() {
       <section className="max-w-xxl mx-auto space-y-8">
         <ButtonAccount />
         <h1 className="text-3xl md:text-4xl font-extrabold">You are signed in</h1>
+        <Generator/>
 
         <NotionEditor />
         
