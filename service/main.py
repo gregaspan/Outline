@@ -6,9 +6,6 @@ from docx import Document
 from pdf2docx import Converter
 from dotenv import load_dotenv
 from pathlib import Path
-import asyncio
-from bs4 import BeautifulSoup
-from playwright.async_api import async_playwright
 
 root = Path(__file__).resolve().parent.parent
 env_path = root / ".env.local"
@@ -90,58 +87,6 @@ def index():
   </script>
 </body></html>
 """
-@app.get("/search-dkum", response_class=JSONResponse)
-async def search_dkum():
-    url = "https://dk.um.si/Iskanje.php?type=enostavno&lang=slv&niz=okej&vir=dk"
-
-    async with async_playwright() as pw:
-        browser = await pw.chromium.launch(headless=True)
-        page = await browser.new_page()
-        await page.goto(url)
-
-        await page.wait_for_selector("div.Besedilo", timeout=10_000)
-
-        containers = await page.query_selector_all("div.Besedilo")
-        html_list = []
-        for element_handle in containers:
-            inner = await element_handle.inner_html()
-            html_list.append(inner)
-
-        await browser.close()
-
-    results = []
-    for html in html_list:
-        soup = BeautifulSoup(html, "html.parser")
-        anchors = soup.find_all("a", href=True)
-
-        if len(anchors) < 2:
-            # skip anything weird
-            continue
-
-        title = anchors[0].get_text(strip=True)
-        author = anchors[1].get_text(strip=True)
-
-        pdf_rel = None
-        for a in anchors:
-            if "Dokument.php" in a["href"]:
-                pdf_rel = a["href"]
-                break
-
-        if not pdf_rel:
-            continue
-
-        if pdf_rel.startswith("http"):
-            pdf_link = pdf_rel
-        else:
-            pdf_link = "https://dk.um.si/" + pdf_rel.lstrip("/")
-
-        results.append({
-            "title":  title,
-            "author": author,
-            "link":   pdf_link
-        })
-
-    return {"works": results}
 
 @app.post("/upload-docx")
 async def upload_docx(file: UploadFile = File(...)):
