@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { v4 as uuidv4 } from "uuid";
-import { Heading1, Heading2, MoreHorizontal, ChevronRight, ChevronDown, Sparkles, Copy, Clipboard, Brain, Volume2, VolumeX } from "lucide-react";
+import { Heading1, Heading2, MoreHorizontal, ChevronRight, ChevronDown, Sparkles, Copy, Clipboard, Brain, Volume2, VolumeX, Shield, Search } from "lucide-react";
 import BlockMenu from "./BlockMenu";
 import { cn } from "../libs/utils";
 import DocumentUploader from "./DocumentUploader";
@@ -69,6 +69,11 @@ export default function Editor() {
     const [playingBlockId, setPlayingBlockId] = useState(null);
     const [loadingTTS, setLoadingTTS] = useState(new Set());
 
+    const [loadingDetection, setLoadingDetection] = useState(new Set());
+    const [loadingPlagiarism, setLoadingPlagiarism] = useState(new Set());
+    const [detectionResults, setDetectionResults] = useState({});
+    const [plagiarismResults, setPlagiarismResults] = useState({});
+
     const refs = useRef({});
 
     useEffect(() => {
@@ -85,12 +90,12 @@ export default function Editor() {
 
             if (text && text.length > 0) {
                 setSelectedText(text);
-                
+
                 const range = selection.getRangeAt(0);
                 const rect = range.getBoundingClientRect();
                 const x = rect.left + rect.width / 2;
                 const y = rect.top;
-                
+
                 setContextMenuPos({ x, y });
                 setShowContextMenu(true);
             } else {
@@ -212,6 +217,86 @@ export default function Editor() {
             stopSpeech();
         } else {
             synthesizeSpeech(block.content, blockId);
+        }
+    };
+
+    // AI Content Detection
+    const checkAIContent = async (blockId) => {
+        const block = blocks.find(b => b.id === blockId);
+        if (!block || !block.content.trim()) return;
+
+        setLoadingDetection(prev => new Set([...prev, blockId]));
+
+        try {
+            const response = await fetch('/api/ai-detection', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    text: block.content,
+                }),
+            });
+
+            if (!response.ok) {
+                throw new Error(`AI Detection API request failed: ${response.status}`);
+            }
+
+            const data = await response.json();
+            setDetectionResults(prev => ({
+                ...prev,
+                [blockId]: data
+            }));
+
+        } catch (error) {
+            console.error('AI Detection Error:', error);
+            alert('Error checking AI content. Please check your Winston AI API configuration.');
+        } finally {
+            setLoadingDetection(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(blockId);
+                return newSet;
+            });
+        }
+    };
+
+    // Plagiarism Detection
+    const checkPlagiarism = async (blockId) => {
+        const block = blocks.find(b => b.id === blockId);
+        if (!block || !block.content.trim()) return;
+
+        setLoadingPlagiarism(prev => new Set([...prev, blockId]));
+
+        try {
+            const response = await fetch('/api/plagiarism-check', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    text: block.content,
+                }),
+            });
+
+            if (!response.ok) {
+                throw new Error(`Plagiarism API request failed: ${response.status}`);
+            }
+
+            const data = await response.json();
+            setPlagiarismResults(prev => ({
+                ...prev,
+                [blockId]: data
+            }));
+
+        } catch (error) {
+            console.error('Plagiarism Check Error:', error);
+            alert('Error checking plagiarism. Please check your Winston AI API configuration.');
+        } finally {
+            setLoadingPlagiarism(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(blockId);
+                return newSet;
+            });
         }
     };
 
@@ -454,6 +539,19 @@ Please provide 1-3 specific, actionable suggestions for improvement - do not wri
             stopSpeech();
         }
 
+        // Clean up detection results
+        setDetectionResults((prev) => {
+            const newResults = { ...prev };
+            delete newResults[id];
+            return newResults;
+        });
+
+        setPlagiarismResults((prev) => {
+            const newResults = { ...prev };
+            delete newResults[id];
+            return newResults;
+        });
+
         setTimeout(() => {
             const focusBlock = newBlocks[Math.max(0, idx - 1)];
             refs.current[focusBlock.id]?.focus();
@@ -584,6 +682,44 @@ Please provide 1-3 specific, actionable suggestions for improvement - do not wri
             </button>
         ) : null;
 
+        // AI Detection button for all blocks with content
+        const aiDetectionButton = block.content?.trim() ? (
+            <button
+                onClick={(e) => {
+                    e.preventDefault();
+                    checkAIContent(block.id);
+                }}
+                disabled={loadingDetection.has(block.id)}
+                className="flex-shrink-0 ml-2 p-1 hover:bg-purple-50 rounded transition-colors group/detection"
+                title="Check AI content"
+            >
+                {loadingDetection.has(block.id) ? (
+                    <div className="animate-spin h-4 w-4 border-2 border-purple-500 border-t-transparent rounded-full"></div>
+                ) : (
+                    <Shield className="h-4 w-4 text-gray-400 group-hover/detection:text-purple-500 transition-colors" />
+                )}
+            </button>
+        ) : null;
+
+        // Plagiarism check button for all blocks with content
+        const plagiarismButton = block.content?.trim() ? (
+            <button
+                onClick={(e) => {
+                    e.preventDefault();
+                    checkPlagiarism(block.id);
+                }}
+                disabled={loadingPlagiarism.has(block.id)}
+                className="flex-shrink-0 ml-2 p-1 hover:bg-orange-50 rounded transition-colors group/plagiarism"
+                title="Check plagiarism"
+            >
+                {loadingPlagiarism.has(block.id) ? (
+                    <div className="animate-spin h-4 w-4 border-2 border-orange-500 border-t-transparent rounded-full"></div>
+                ) : (
+                    <Search className="h-4 w-4 text-gray-400 group-hover/plagiarism:text-orange-500 transition-colors" />
+                )}
+            </button>
+        ) : null;
+
         const suggestButton = isHeadingBlock ? (
             <button
                 onClick={(e) => {
@@ -610,6 +746,8 @@ Please provide 1-3 specific, actionable suggestions for improvement - do not wri
                 </div>
                 <div className="opacity-0 group-hover/heading:opacity-100 transition-opacity flex items-center">
                     {ttsButton}
+                    {aiDetectionButton}
+                    {plagiarismButton}
                     {suggestButton}
                 </div>
             </div>
@@ -622,6 +760,8 @@ Please provide 1-3 specific, actionable suggestions for improvement - do not wri
                 </div>
                 <div className="opacity-0 group-hover/block:opacity-100 transition-opacity flex items-center ml-2">
                     {ttsButton}
+                    {aiDetectionButton}
+                    {plagiarismButton}
                 </div>
             </div>
         );
@@ -751,6 +891,257 @@ Please provide 1-3 specific, actionable suggestions for improvement - do not wri
                                     </div>
                                 </div>
                             )}
+                            {/* AI Detection Results - Comprehensive */}
+{detectionResults[block.id] && (
+    <div className="mt-4 p-4 bg-purple-50 border border-purple-200 rounded-lg">
+        <div className="flex items-center mb-3">
+            <Shield className="h-4 w-4 text-purple-500 mr-2" />
+            <h4 className="font-medium text-purple-800">
+                AI Content Detection Results
+            </h4>
+            <button
+                onClick={() =>
+                    setDetectionResults((prev) => {
+                        const newResults = { ...prev };
+                        delete newResults[block.id];
+                        return newResults;
+                    })
+                }
+                className="ml-auto text-purple-600 hover:text-purple-800 text-sm"
+            >
+                ✕
+            </button>
+        </div>
+        <div className="space-y-3 text-sm">
+            {/* Main Scores */}
+            <div className="grid grid-cols-2 gap-4">
+                <div className="bg-white p-3 rounded border">
+                    <p className="font-semibold text-purple-800">Overall AI Score</p>
+                    <p className="text-2xl font-bold text-purple-600">
+                        {detectionResults[block.id].score}%
+                    </p>
+                </div>
+                <div className="bg-white p-3 rounded border">
+                    <p className="font-semibold text-purple-800">Readability Score</p>
+                    <p className="text-2xl font-bold text-purple-600">
+                        {detectionResults[block.id].readability_score || 'N/A'}
+                    </p>
+                </div>
+            </div>
+
+            {/* Sentence Analysis */}
+            {detectionResults[block.id].sentences && Array.isArray(detectionResults[block.id].sentences) && (
+                <div className="bg-white p-3 rounded border">
+                    <p className="font-semibold text-purple-800 mb-2">Sentence-by-Sentence Analysis</p>
+                    <div className="max-h-40 overflow-y-auto space-y-2">
+                        {detectionResults[block.id].sentences.map((sentence, index) => (
+                            <div key={index} className="p-2 bg-gray-50 rounded text-xs">
+                                <div className="flex justify-between items-start mb-1">
+                                    <span className="font-medium">Sentence {index + 1}</span>
+                                    <span className={`px-2 py-1 rounded text-xs font-bold ${
+                                        sentence.score > 80 ? 'bg-red-100 text-red-800' :
+                                        sentence.score > 50 ? 'bg-yellow-100 text-yellow-800' :
+                                        'bg-green-100 text-green-800'
+                                    }`}>
+                                        {sentence.score}%
+                                    </span>
+                                </div>
+                                <p className="text-gray-700 leading-tight">
+                                    {sentence.text?.substring(0, 150)}{sentence.text?.length > 150 ? '...' : ''}
+                                </p>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+        </div>
+    </div>
+)}
+
+{/* Plagiarism Results - Comprehensive */}
+{plagiarismResults[block.id] && (
+    <div className="mt-4 p-4 bg-orange-50 border border-orange-200 rounded-lg">
+        <div className="flex items-center mb-3">
+            <Search className="h-4 w-4 text-orange-500 mr-2" />
+            <h4 className="font-medium text-orange-800">
+                Plagiarism Check Results
+            </h4>
+            <button
+                onClick={() =>
+                    setPlagiarismResults((prev) => {
+                        const newResults = { ...prev };
+                        delete newResults[block.id];
+                        return newResults;
+                    })
+                }
+                className="ml-auto text-orange-600 hover:text-orange-800 text-sm"
+            >
+                ✕
+            </button>
+        </div>
+        <div className="space-y-3 text-sm">
+            {/* Main Score */}
+            <div className="bg-white p-3 rounded border text-center">
+                <p className="font-semibold text-orange-800">Plagiarism Score</p>
+                <p className={`text-3xl font-bold ${
+                    plagiarismResults[block.id].result?.score > 20 ? 'text-red-600' :
+                    plagiarismResults[block.id].result?.score > 10 ? 'text-yellow-600' :
+                    'text-green-600'
+                }`}>
+                    {plagiarismResults[block.id].result?.score || 0}%
+                </p>
+            </div>
+
+
+            {/* Detailed Statistics */}
+            {plagiarismResults[block.id].result && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="bg-white p-3 rounded border">
+                        <p className="font-semibold text-orange-800 mb-2">Word Statistics</p>
+                        <p><strong>Total Words:</strong> {plagiarismResults[block.id].result.textWordCounts}</p>
+                        <p><strong>Plagiarized Words:</strong> {plagiarismResults[block.id].result.totalPlagiarismWords}</p>
+                        <p><strong>Identical Words:</strong> {plagiarismResults[block.id].result.identicalWordCounts}</p>
+                        <p><strong>Similar Words:</strong> {plagiarismResults[block.id].result.similarWordCounts}</p>
+                    </div>
+                    <div className="bg-white p-3 rounded border">
+                        <p className="font-semibold text-orange-800 mb-2">Source Information</p>
+                        <p><strong>Sources Found:</strong> {plagiarismResults[block.id].result.sourceCounts || 0}</p>
+                    </div>
+                </div>
+            )}
+
+            {/* Sources */}
+            {plagiarismResults[block.id].sources && plagiarismResults[block.id].sources.length > 0 && (
+                <div className="bg-white p-3 rounded border">
+                    <p className="font-semibold text-orange-800 mb-2">Sources Found ({plagiarismResults[block.id].sources.length})</p>
+                    <div className="max-h-60 overflow-y-auto space-y-3">
+                        {plagiarismResults[block.id].sources.map((source, index) => (
+                            <div key={index} className="p-3 bg-gray-50 rounded border">
+                                <div className="flex justify-between items-start mb-2">
+                                    <div className="flex-1">
+                                        <p className="font-medium text-gray-800">
+                                            {source.title || 'Untitled Source'}
+                                        </p>
+                                        {source.url && (
+                                            <a 
+                                                href={source.url} 
+                                                target="_blank" 
+                                                rel="noopener noreferrer"
+                                                className="text-blue-600 hover:text-blue-800 text-xs break-all"
+                                            >
+                                                {source.url}
+                                            </a>
+                                        )}
+                                    </div>
+                                    <span className={`px-2 py-1 rounded text-xs font-bold ml-2 ${
+                                        source.score > 80 ? 'bg-red-100 text-red-800' :
+                                        source.score > 50 ? 'bg-yellow-100 text-yellow-800' :
+                                        'bg-orange-100 text-orange-800'
+                                    }`}>
+                                        {source.score}%
+                                    </span>
+                                </div>
+                                
+                                <div className="grid grid-cols-2 gap-2 text-xs text-gray-600 mb-2">
+                                    <p><strong>Plagiarized Words:</strong> {source.plagiarismWords}</p>
+                                    <p><strong>Total Words:</strong> {source.totalNumberOfWords}</p>
+                                    <p><strong>Identical:</strong> {source.identicalWordCounts}</p>
+                                    <p><strong>Similar:</strong> {source.similarWordCounts}</p>
+                                </div>
+
+                                {source.author && (
+                                    <p className="text-xs text-gray-600"><strong>Author:</strong> {source.author}</p>
+                                )}
+                                
+                                {source.description && (
+                                    <p className="text-xs text-gray-600 mt-1">
+                                        <strong>Description:</strong> {source.description.substring(0, 100)}
+                                        {source.description.length > 100 ? '...' : ''}
+                                    </p>
+                                )}
+
+                                {source.publishedDate && (
+                                    <p className="text-xs text-gray-600">
+                                        <strong>Published:</strong> {new Date(source.publishedDate).toLocaleDateString()}
+                                    </p>
+                                )}
+
+                                <div className="flex gap-2 mt-2">
+                                    {source.canAccess && (
+                                        <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded">Accessible</span>
+                                    )}
+                                    {source.citation && (
+                                        <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">Citation</span>
+                                    )}
+                                    {source.is_excluded && (
+                                        <span className="px-2 py-1 bg-gray-100 text-gray-800 text-xs rounded">Excluded</span>
+                                    )}
+                                </div>
+
+                                {/* Plagiarism Found Sequences */}
+                                {source.plagiarismFound && source.plagiarismFound.length > 0 && (
+                                    <details className="mt-2">
+                                        <summary className="text-xs font-medium cursor-pointer text-orange-700">
+                                            View Plagiarized Sequences ({source.plagiarismFound.length})
+                                        </summary>
+                                        <div className="mt-2 space-y-1 max-h-32 overflow-y-auto">
+                                            {source.plagiarismFound.map((seq, seqIndex) => (
+                                                <div key={seqIndex} className="bg-red-50 p-2 rounded text-xs">
+                                                    <p className="text-gray-600">
+                                                        <strong>Position:</strong> {seq.startIndex}-{seq.endIndex}
+                                                    </p>
+                                                    <p className="text-red-800 font-medium">
+                                                        "{seq.sequence}"
+                                                    </p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </details>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Similar Words */}
+            {plagiarismResults[block.id].similarWords && plagiarismResults[block.id].similarWords.length > 0 && (
+                <details className="bg-white p-3 rounded border">
+                    <summary className="font-semibold text-orange-800 cursor-pointer">
+                        Similar Words ({plagiarismResults[block.id].similarWords.length})
+                    </summary>
+                    <div className="mt-2 max-h-32 overflow-y-auto">
+                        <div className="flex flex-wrap gap-1 text-xs">
+                            {plagiarismResults[block.id].similarWords.map((word, index) => (
+                                <span key={index} className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded">
+                                    {word.word} ({word.index})
+                                </span>
+                            ))}
+                        </div>
+                    </div>
+                </details>
+            )}
+
+            {/* Citations */}
+            {plagiarismResults[block.id].citations && plagiarismResults[block.id].citations.length > 0 && (
+                <details className="bg-white p-3 rounded border">
+                    <summary className="font-semibold text-orange-800 cursor-pointer">
+                        Citations ({plagiarismResults[block.id].citations.length})
+                    </summary>
+                    <div className="mt-2 space-y-1 max-h-32 overflow-y-auto text-xs">
+                        {plagiarismResults[block.id].citations.map((citation, index) => (
+                            <p key={index} className="p-2 bg-blue-50 rounded text-blue-800">
+                                {citation}
+                            </p>
+                        ))}
+                    </div>
+                </details>
+            )}
+
+           
+        </div>
+    </div>
+)}
                         </div>
                     </div>
                 ))}
