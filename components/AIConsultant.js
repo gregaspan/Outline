@@ -140,8 +140,7 @@ When you reply:
                         Izbrani tekst:
                     </h4>
                     <div className="bg-white p-3 rounded border text-sm text-gray-800 max-h-32 overflow-y-auto">
-                        "{selectedText}"
-                    </div>
+                        &quot;{selectedText}&quot;                    </div>
                 </div>
 
                 {/* Content Area */}

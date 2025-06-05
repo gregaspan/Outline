@@ -56,7 +56,7 @@ export default function Dashboard() {
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="text-lg font-semibold text-gray-900">Welcome Back</h3>
-                    <p className="text-sm text-gray-600 mt-1">You're successfully signed in</p>
+                    <p className="text-sm text-gray-600 mt-1">You are successfully signed in</p>
                   </div>
                   <div className="w-12 h-12 bg-blue-500 rounded-lg flex items-center justify-center">
                     <Home className="w-6 h-6 text-white" />

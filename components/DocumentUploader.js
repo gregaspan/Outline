@@ -1,6 +1,6 @@
 import React, { useState, useRef } from "react";
 
-const API_BASE = "http://127.0.0.1:8000";
+const API_BASE = "https://outline-api.onrender.com";
 
 export default function DocumentUploader({ onResult }) {
   const [error, setError] = useState(null);

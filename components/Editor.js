@@ -1091,8 +1091,7 @@ Please provide 1-3 specific, actionable suggestions for improvement - do not wri
                                                         <strong>Position:</strong> {seq.startIndex}-{seq.endIndex}
                                                     </p>
                                                     <p className="text-red-800 font-medium">
-                                                        "{seq.sequence}"
-                                                    </p>
+                                                        &quot;{seq.sequence}&quot;                                                    </p>
                                                 </div>
                                             ))}
                                         </div>
