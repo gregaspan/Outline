@@ -116,7 +116,7 @@ const ResultSummary = ({ frontMatter, bodySections }) => {
                 {/* Front Matter Sections */}
                 <div className="space-y-4">
                     <div className="flex items-center space-x-2">
-                        <h4 className="font-medium text-gray-900">Uvodni del</h4>
+                        <h4 className="font-medium text-gray-900">Preverjanje strukture</h4>
                         <span className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded-full">
                             {frontMatterCount}/{Object.keys(frontMatter).length}
                         </span>
@@ -136,7 +136,7 @@ const ResultSummary = ({ frontMatter, bodySections }) => {
                 {/* Body Sections */}
                 <div className="space-y-4">
                     <div className="flex items-center space-x-2">
-                        <h4 className="font-medium text-gray-900">Vsebinski del</h4>
+                        <h4 className="font-medium text-gray-900">Analiza vsebine</h4>
                         <span className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded-full">
                             {bodyCount}/{Object.keys(bodySections).length}
                         </span>
