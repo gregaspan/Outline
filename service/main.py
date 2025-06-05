@@ -6,12 +6,30 @@ from docx import Document
 from pdf2docx import Converter
 from dotenv import load_dotenv
 from pathlib import Path
+from supabase import create_client, Client
+from datetime import datetime
+import logging
+
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 root = Path(__file__).resolve().parent.parent
 env_path = root / ".env.local"
 load_dotenv(dotenv_path=env_path)
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+
+# Supabase configuration
+SUPABASE_URL = os.getenv("NEXT_PUBLIC_SUPABASE_URL")
+SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+
+if not SUPABASE_URL or not SUPABASE_SERVICE_KEY:
+    logger.warning("Supabase credentials not found. Database operations will be disabled.")
+    supabase = None
+else:
+    supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+    logger.info("Supabase client initialized successfully")
 
 app = FastAPI()
 app.add_middleware(
@@ -60,7 +78,98 @@ SECTION_PATTERNS = {
 
 ROMAN_RE = re.compile(r"^[IVXLCDM]+$", re.IGNORECASE)
 
-# --- Endpoints ---
+# --- Supabase Helper Functions ---
+
+async def save_document_to_supabase(filename: str, file_type: str, analysis_result: dict):
+    """Save document analysis to Supabase"""
+    if not supabase:
+        logger.warning("Supabase not configured, skipping database save")
+        return None
+    
+    try:
+        # Extract data from analysis result
+        notranja = analysis_result.get("notranja_naslovna", {})
+        structure = analysis_result.get("structure_analysis", {})
+        
+        # Prepare document data
+        document_data = {
+            "filename": filename,
+            "file_type": file_type,
+            "title": notranja.get("title"),
+            "document_type": notranja.get("type"),
+            "student_name": notranja.get("student"),
+            "study_program": notranja.get("program"),
+            "study_direction": notranja.get("smer"),
+            "mentor": notranja.get("mentor"),
+            "co_mentor": notranja.get("somentor"),
+            "lecturer": notranja.get("lektor"),
+            "overall_score": structure.get("overall_score"),
+            "total_sections": structure.get("total_sections"),
+            "found_sections": structure.get("found_sections"),
+            "missing_critical_count": structure.get("missing_critical"),
+            "uvod_quality": structure.get("uvod_quality"),
+            "front_matter_analysis": analysis_result.get("front_matter_found", {}),
+            "body_sections_analysis": analysis_result.get("body_sections_found", {}),
+            "missing_sections": analysis_result.get("missing_sections", []),
+            "missing_body_sections": analysis_result.get("missing_body_sections", []),
+            "recommendations": structure.get("recommendations", []),
+            "table_of_contents": analysis_result.get("table_of_contents", []),
+            "uvod_content": analysis_result.get("uvod", []),
+        }
+        
+        # Insert document record
+        document_result = supabase.table("documents").insert(document_data).execute()
+        
+        if document_result.data:
+            document_id = document_result.data[0]["id"]
+            logger.info(f"Document saved with ID: {document_id}")
+            
+            # Save paragraphs
+            paragraphs = analysis_result.get("paragraphs", [])
+            if paragraphs:
+                await save_paragraphs_to_supabase(document_id, paragraphs)
+            
+            return document_id
+        else:
+            logger.error("Failed to save document to Supabase")
+            return None
+            
+    except Exception as e:
+        logger.error(f"Error saving document to Supabase: {str(e)}")
+        return None
+
+async def save_paragraphs_to_supabase(document_id: str, paragraphs: list):
+    """Save document paragraphs to Supabase"""
+    if not supabase:
+        return
+    
+    try:
+        # Prepare paragraph data
+        paragraph_data = []
+        for idx, paragraph in enumerate(paragraphs):
+            paragraph_data.append({
+                "document_id": document_id,
+                "paragraph_order": idx,
+                "paragraph_id": paragraph.get("id"),
+                "paragraph_style": paragraph.get("style"),
+                "content": paragraph.get("content", "")
+            })
+        
+        # Insert paragraphs in batches (Supabase has limits)
+        batch_size = 100
+        for i in range(0, len(paragraph_data), batch_size):
+            batch = paragraph_data[i:i + batch_size]
+            result = supabase.table("document_paragraphs").insert(batch).execute()
+            
+            if not result.data:
+                logger.error(f"Failed to save paragraph batch {i // batch_size + 1}")
+        
+        logger.info(f"Saved {len(paragraphs)} paragraphs for document {document_id}")
+        
+    except Exception as e:
+        logger.error(f"Error saving paragraphs to Supabase: {str(e)}")
+
+# --- API Endpoints ---
 
 @app.get("/", response_class=HTMLResponse)
 def index():
@@ -97,7 +206,18 @@ async def upload_docx(file: UploadFile = File(...)):
         doc = Document(io.BytesIO(data))
     except Exception as e:
         raise HTTPException(400, f"Error reading DOCX: {e}")
-    return _process_document(doc)
+    
+    # Process document
+    analysis_result = _process_document(doc)
+    
+    # Save to Supabase
+    document_id = await save_document_to_supabase(file.filename, "docx", analysis_result)
+    
+    # Add document_id to response
+    response_data = analysis_result.copy()
+    response_data["document_id"] = document_id
+    
+    return JSONResponse(response_data)
 
 @app.post("/upload-pdf")
 async def upload_pdf(file: UploadFile = File(...)):
@@ -120,9 +240,76 @@ async def upload_pdf(file: UploadFile = File(...)):
         raise HTTPException(500, f"Error reading converted DOCX: {e}")
     finally:
         os.unlink(pdf_path); os.unlink(docx_path)
-    return _process_document(doc)
+    
+    # Process document
+    analysis_result = _process_document(doc)
+    
+    # Save to Supabase
+    document_id = await save_document_to_supabase(file.filename, "pdf", analysis_result)
+    
+    # Add document_id to response
+    response_data = analysis_result.copy()
+    response_data["document_id"] = document_id
+    
+    return JSONResponse(response_data)
 
-# --- Core processing ---
+@app.get("/documents")
+async def get_documents():
+    """Get list of all documents"""
+    if not supabase:
+        raise HTTPException(500, "Database not configured")
+    
+    try:
+        result = supabase.table("document_summary").select("*").order("created_at", desc=True).execute()
+        return {"documents": result.data}
+    except Exception as e:
+        logger.error(f"Error fetching documents: {str(e)}")
+        raise HTTPException(500, f"Error fetching documents: {str(e)}")
+
+@app.get("/documents/{document_id}")
+async def get_document(document_id: str):
+    """Get specific document with paragraphs"""
+    if not supabase:
+        raise HTTPException(500, "Database not configured")
+    
+    try:
+        # Get document
+        doc_result = supabase.table("documents").select("*").eq("id", document_id).execute()
+        if not doc_result.data:
+            raise HTTPException(404, "Document not found")
+        
+        # Get paragraphs
+        para_result = supabase.table("document_paragraphs").select("*").eq("document_id", document_id).order("paragraph_order").execute()
+        
+        document = doc_result.data[0]
+        document["paragraphs"] = para_result.data
+        
+        return {"document": document}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching document {document_id}: {str(e)}")
+        raise HTTPException(500, f"Error fetching document: {str(e)}")
+
+@app.delete("/documents/{document_id}")
+async def delete_document(document_id: str):
+    """Delete a document and its paragraphs"""
+    if not supabase:
+        raise HTTPException(500, "Database not configured")
+    
+    try:
+        result = supabase.table("documents").delete().eq("id", document_id).execute()
+        if result.data:
+            return {"message": "Document deleted successfully"}
+        else:
+            raise HTTPException(404, "Document not found")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting document {document_id}: {str(e)}")
+        raise HTTPException(500, f"Error deleting document: {str(e)}")
+
+# --- Core processing (unchanged) ---
 
 def _process_document(doc: Document):
     # 1. Extract all paragraphs
@@ -186,7 +373,7 @@ def _process_document(doc: Document):
     # 8. Calculate enhanced metrics
     structure_analysis = _calculate_structure_metrics(front, body, uvod)
 
-    return JSONResponse({
+    return {
         "notranja_naslovna": notranja,
         "paragraphs": output_para,
         "front_matter_found": front,
@@ -196,10 +383,10 @@ def _process_document(doc: Document):
         "missing_body_sections": missing_body,
         "table_of_contents": toc,
         "structure_analysis": structure_analysis
-    })
+    }
 
 
-# --- Helper functions ---
+# --- Helper functions (unchanged) ---
 
 def _calculate_structure_metrics(front_matter, body_sections, uvod):
     """Calculate comprehensive structure analysis metrics"""
