@@ -197,6 +197,11 @@ def index():
 </body></html>
 """
 
+@app.get("/health")
+def health_check():
+    """Health check endpoint"""
+    return {"status": "ok", "message": "Service is running"}
+
 @app.post("/upload-docx")
 async def upload_docx(file: UploadFile = File(...)):
     if not file.filename.lower().endswith(".docx"):
