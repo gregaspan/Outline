@@ -12,7 +12,10 @@ import {
   Zap, 
   Menu, 
   X,
-  ChevronRight
+  ChevronRight,
+  BookOpen,
+  Code2,
+  ExternalLink
 } from 'lucide-react';
 
 export const dynamic = "force-dynamic";
@@ -26,6 +29,21 @@ export default function Dashboard() {
     { id: 'generator', label: 'Generator', icon: Zap },
     { id: 'editor', label: 'Editor', icon: FileText },
     { id: 'settings', label: 'Settings', icon: Settings },
+  ];
+
+  const externalLinks = [
+    { 
+      label: 'Documentation', 
+      href: 'https://outline-1.gitbook.io/outline', 
+      icon: BookOpen,
+      description: 'View documentation'
+    },
+    { 
+      label: 'FastAPI', 
+      href: 'https://outline-api.onrender.com/docs', 
+      icon: Code2,
+      description: 'FastAPI framework'
+    },
   ];
 
   const renderContent = () => {
@@ -180,6 +198,34 @@ export default function Dashboard() {
               );
             })}
           </nav>
+
+          {/* External Links Section */}
+          <div className="px-4 pb-4">
+            <div className="border-t border-gray-200 pt-4">
+              <h3 className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                External Resources
+              </h3>
+              <div className="space-y-1">
+                {externalLinks.map((link) => {
+                  const Icon = link.icon;
+                  return (
+                    <a
+                      key={link.label}
+                      href={link.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-full flex items-center px-4 py-3 text-left rounded-lg transition-colors duration-200 text-gray-700 hover:bg-gray-50 hover:text-gray-900 group"
+                      title={link.description}
+                    >
+                      <Icon className="w-5 h-5 mr-3 text-gray-400 group-hover:text-gray-600" />
+                      <span className="font-medium flex-1">{link.label}</span>
+                      <ExternalLink className="w-4 h-4 text-gray-300 group-hover:text-gray-500" />
+                    </a>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
 
           {/* Bottom section */}
           <div className="p-4 border-t border-gray-200">
