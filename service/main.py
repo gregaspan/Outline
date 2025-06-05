@@ -171,31 +171,9 @@ async def save_paragraphs_to_supabase(document_id: str, paragraphs: list):
 
 # --- API Endpoints ---
 
-@app.get("/", response_class=HTMLResponse)
-def index():
-    return """
-<html><body>
-  <input type="file" id="file"
-         accept="application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-         onchange="upload(this.files[0])">
-  <pre id="output"></pre>
-  <script>
-    async function upload(f) {
-      const out = document.getElementById('output');
-      let fd = new FormData(); fd.append('file', f);
-      let url = f.name.toLowerCase().endsWith('.pdf') ? '/upload-pdf' : '/upload-docx';
-      try {
-        let res = await fetch(url, { method: 'POST', body: fd });
-        if (!res.ok) throw new Error(await res.text());
-        let j  = await res.json();
-        out.textContent = JSON.stringify(j, null, 2);
-      } catch (e) {
-        out.textContent = 'Error: ' + e;
-      }
-    }
-  </script>
-</body></html>
-"""
+@app.get("/")
+def read_root():
+    return {"Hello": "World"}
 
 @app.get("/health")
 def health_check():
@@ -468,18 +446,24 @@ def _extract_notranja_info(paragraphs):
             "program": None, "smer": None,
             "mentor": None, "somentor": None, "lektor": None}
     for idx, p in enumerate(paragraphs):
-        c = p["content"].strip()
+        c = p["content"].strip()  
         if TYPE_PATTERN.search(c):
             info["type"] = c
             # title lines before
             title_lines = []
             j = idx - 1
             while j >= 0 and paragraphs[j]["content"].strip():
-                if TYPE_PATTERN.search(paragraphs[j]["content"]):
+                line_content = paragraphs[j]["content"].strip()
+                if TYPE_PATTERN.search(line_content):
                     break
-                title_lines.insert(0, paragraphs[j]["content"].strip())
+                # Skip city/date lines
+                if CITYDATE_PATTERN.match(line_content):
+                    j -= 1
+                    continue
+                title_lines.insert(0, line_content)
                 j -= 1
-            info["title"] = " ".join(title_lines)
+                info["title"] = " ".join(title_lines)
+        
         if c.startswith("Študent"):
             info["student"] = c.split(":",1)[1].strip()
         elif c.startswith("Študijski program"):

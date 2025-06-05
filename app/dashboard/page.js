@@ -184,7 +184,7 @@ export default function Dashboard() {
           {/* Bottom section */}
           <div className="p-4 border-t border-gray-200">
             <div className="text-xs text-gray-500 text-center">
-              © 2024 Outline
+              © 2025 Outline
             </div>
           </div>
         </div>
