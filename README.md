@@ -9,6 +9,7 @@
 [![Docs](https://img.shields.io/badge/Documentation-Read-orange)](https://outline-1.gitbook.io/outline)
 [![API Docs](https://img.shields.io/badge/API-Documentation-yellow)](https://outline-api.onrender.com/docs)
 [![Slides](https://img.shields.io/badge/Presentation-View-red)](https://docs.google.com/presentation/d/11TM090TTfFLzfuxOkDBz5fUKdauTpoYypmjBFcOKiiE/edit?usp=sharing)
+[![Walkthrough](https://img.shields.io/badge/Walkthrough-Watch-purple)](https://www.loom.com/share/009831feafe14009ae718fbc9fb5678a)
 
 ## 📂 Repository Structure
 
