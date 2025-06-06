@@ -13,14 +13,14 @@ export default function Page() {
           <h1 className="text-3xl font-extrabold">Outline</h1>
 
           <p className="text-lg opacity-80">
-            API          </p>
+            Landing page          </p>
 
           <a
             className="btn btn-primary"
             href="https://outline-api.onrender.com/docs"
             target="_blank"
           >
-            TODO: App {" "}
+            API {" "}
             <svg
               xmlns="http://www.w3.org/2000/svg"
               viewBox="0 0 20 20"
