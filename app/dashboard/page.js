@@ -169,7 +169,7 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Mobile menu button */}
-      <div className="lg:hidden fixed top-6 left-6 z-50">
+      <div className="lg:hidden fixed top-6 right-6 z-50">
         <button
           onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
           className="p-2 bg-white rounded-lg shadow-sm border border-gray-200 hover:border-gray-300 transition-colors duration-200"
