@@ -1,14 +1,20 @@
-const nextConfig = {
+const withPWA = require('next-pwa')({
+  dest: 'public',
+  disable: process.env.NODE_ENV === 'development',
+  register: true,
+  skipWaiting: true,
+});
+
+const nextConfig = withPWA({
   reactStrictMode: true,
   images: {
     domains: [
-      // NextJS <Image> component needs to whitelist domains for src={}
       "lh3.googleusercontent.com",
       "pbs.twimg.com",
       "images.unsplash.com",
       "logos-world.net",
     ],
   },
-};
+});
 
 module.exports = nextConfig;
