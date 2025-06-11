@@ -769,31 +769,31 @@ Please provide 1-3 specific, actionable suggestions for improvement - do not wri
         switch (block.type) {
             case "heading-1":
                 return (
-                    <h1 className="text-3xl font-bold mt-6 mb-2">
+                    <h1 className="text-3xl font-bold mt-6 mb-2 text-black">
                         {headingContent(block.content)}
                     </h1>
                 );
             case "heading-2":
                 return (
-                    <h2 className="text-2xl font-semibold mt-5 mb-2">
+                    <h2 className="text-2xl font-semibold mt-5 mb-2 text-black">
                         {headingContent(block.content)}
                     </h2>
                 );
             case "heading-3":
                 return (
-                    <h3 className="text-xl font-medium mt-4 mb-2">
+                    <h3 className="text-xl font-medium mt-4 mb-2 text-black">
                         {headingContent(block.content)}
                     </h3>
                 );
             case "caption":
                 return (
-                    <div className="text-sm italic text-gray-500 mt-2 mb-4">
+                    <div className="text-sm italic text-gray-500 mt-2 mb-4 text-gray">
                         {regularContent(block.content)}
                     </div>
                 );
             default:
                 return (
-                    <p>
+                    <p className="text-black">
                         {regularContent(block.content)}
                     </p>
                 );
@@ -820,10 +820,9 @@ Please provide 1-3 specific, actionable suggestions for improvement - do not wri
                 />
             )}
 
-            {/* Title */}
-            <h1 className="text-3xl font-bold mt-6 mb-2 outline-none">{title}</h1>
+                        <h1 className="text-3xl font-bold mt-6 mb-2 outline-none text-black">{title}</h1>
 
-            {/* Editor Blocks */}
+                        {/* Editor Blocks */}
             <div className="space-y-3">
                 {visibleBlocks.map((block) => (
                     <div key={block.id} className="group relative flex items-start">
