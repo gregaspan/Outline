@@ -6,9 +6,6 @@ import { Popover, Transition } from "@headlessui/react";
 import { createClient } from "@/libs/supabase/client";
 import apiClient from "@/libs/api";
 
-// A button to show user some account actions
-//  1. Billing: open a Stripe Customer Portal to manage their billing (cancel subscription, update payment method, etc.).
-//  2. Logout: sign out and go back to homepage
 const ButtonAccount = () => {
   const supabase = createClient();
   const [isLoading, setIsLoading] = useState(false);
@@ -48,38 +45,40 @@ const ButtonAccount = () => {
   };
 
   return (
-    <Popover className="relative z-10">
+    <Popover className="relative">
       {({ open }) => (
         <>
-          <Popover.Button className="btn">
+          <Popover.Button className="flex items-center space-x-2 px-2 py-1.5 rounded-lg hover:bg-gray-100 transition-colors focus:outline-none focus:ring-0">
             {user?.user_metadata?.avatar_url ? (
               <img
                 src={user?.user_metadata?.avatar_url}
-                alt={"Profile picture"}
-                className="w-6 h-6 rounded-full shrink-0"
+                alt="Profile"
+                className="w-7 h-7 rounded-lg object-cover"
                 referrerPolicy="no-referrer"
-                width={24}
-                height={24}
+                width={28}
+                height={28}
               />
             ) : (
-              <span className="w-8 h-8 bg-base-100 flex justify-center items-center rounded-full shrink-0 capitalize">
-                {user?.email?.charAt(0)}
-              </span>
+              <div className="w-7 h-7 bg-gray-200 flex items-center justify-center rounded-lg text-gray-600 text-sm font-medium">
+                {user?.email?.charAt(0)?.toUpperCase() || 'U'}
+              </div>
             )}
 
-            {user?.user_metadata?.name ||
-              user?.email?.split("@")[0] ||
-              "Account"}
+            <span className="text-sm font-medium text-gray-700 hidden sm:block">
+              {user?.user_metadata?.name ||
+                user?.email?.split("@")[0] ||
+                "Account"}
+            </span>
 
             {isLoading ? (
-              <span className="loading loading-spinner loading-xs"></span>
+              <div className="w-4 h-4 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin"></div>
             ) : (
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 viewBox="0 0 20 20"
                 fill="currentColor"
-                className={`w-5 h-5 duration-200 opacity-50 ${
-                  open ? "transform rotate-180 " : ""
+                className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${
+                  open ? "rotate-180" : ""
                 }`}
               >
                 <path
@@ -90,6 +89,7 @@ const ButtonAccount = () => {
               </svg>
             )}
           </Popover.Button>
+
           <Transition
             enter="transition duration-100 ease-out"
             enterFrom="transform scale-95 opacity-0"
@@ -98,36 +98,28 @@ const ButtonAccount = () => {
             leaveFrom="transform scale-100 opacity-100"
             leaveTo="transform scale-95 opacity-0"
           >
-            <Popover.Panel className="absolute left-0 z-10 mt-3 w-screen max-w-[16rem] transform">
-              <div className="overflow-hidden rounded-xl shadow-xl ring-1 ring-base-content ring-opacity-5 bg-base-100 p-1">
-                <div className="space-y-0.5 text-sm">
+            <Popover.Panel className="absolute right-0 z-10 mt-2 w-48">
+              <div className="bg-white rounded-lg shadow-lg border border-gray-200 py-1">
+                <div className="px-3 py-2 border-b border-gray-100">
+                  <p className="text-sm font-medium text-gray-900">
+                    {user?.user_metadata?.name || user?.email?.split("@")[0] || "Account"}
+                  </p>
+                  <p className="text-xs text-gray-500 truncate">
+                    {user?.email}
+                  </p>
+                </div>
+                
+                <div className="py-1">
+                  
                   <button
-                    className="flex items-center gap-2 hover:bg-base-300 duration-200 py-1.5 px-4 w-full rounded-lg font-medium"
-                    onClick={handleBilling}
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      viewBox="0 0 20 20"
-                      fill="currentColor"
-                      className="w-5 h-5"
-                    >
-                      <path
-                        fillRule="evenodd"
-                        d="M2.5 4A1.5 1.5 0 001 5.5V6h18v-.5A1.5 1.5 0 0017.5 4h-15zM19 8.5H1v6A1.5 1.5 0 002.5 16h15a1.5 1.5 0 001.5-1.5v-6zM3 13.25a.75.75 0 01.75-.75h1.5a.75.75 0 010 1.5h-1.5a.75.75 0 01-.75-.75zm4.75-.75a.75.75 0 000 1.5h3.5a.75.75 0 000-1.5h-3.5z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                    Billing
-                  </button>
-                  <button
-                    className="flex items-center gap-2 hover:bg-error/20 hover:text-error duration-200 py-1.5 px-4 w-full rounded-lg font-medium"
+                    className="flex items-center w-full px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
                     onClick={handleSignOut}
                   >
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
                       viewBox="0 0 20 20"
                       fill="currentColor"
-                      className="w-5 h-5"
+                      className="w-4 h-4 mr-3"
                     >
                       <path
                         fillRule="evenodd"
@@ -140,7 +132,7 @@ const ButtonAccount = () => {
                         clipRule="evenodd"
                       />
                     </svg>
-                    Logout
+                    Sign out
                   </button>
                 </div>
               </div>

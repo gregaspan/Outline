@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from 'react';
-import { ChevronDown, ChevronRight, FileText, Download, Settings, Play, Pause, RotateCcw } from 'lucide-react';
+import { ChevronRight, FileText, Download, Play, Pause, RotateCcw, Plus } from 'lucide-react';
 
 const Generator = () => {
   const [topic, setTopic] = useState('');
@@ -316,110 +316,71 @@ Return nothing except the formatted list.`
   };
 
   return (
-    <div className="max-w-6xl mx-auto p-6 bg-white">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2 flex items-center gap-2">
-          <FileText className="h-8 w-8 text-blue-600" />
-          Generator
-        </h1>
-      </div>
+    <div className="min-h-screen bg-white">
 
-      {/* Configuration Panel */}
-      <div className="bg-gray-50 rounded-lg p-6 mb-6">
-        <div className="flex items-center gap-2 mb-4">
-          <Settings className="h-5 w-5 text-gray-600" />
-          <h2 className="text-lg font-semibold text-gray-900">Nastavitve</h2>
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Tema raziskave
-            </label>
-            <input
-              type="text"
-              value={topic}
-              onChange={(e) => setTopic(e.target.value)}
-              placeholder="npr. Umetna inteligenca v izobraževanju"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              disabled={isGenerating}
-            />
-          </div>
+      <div className="max-w-4xl mx-auto px-6 py-8">
+        <div className="mb-8">
+          <input
+            type="text"
+            value={topic}
+            onChange={(e) => setTopic(e.target.value)}
+            placeholder="Enter your research topic..."
+            className="w-full text-2xl font-medium text-gray-900 placeholder-gray-400 border-none outline-none bg-transparent"
+            disabled={isGenerating}
+          />
           
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Jezik
-            </label>
+          <div className="flex items-center gap-6 mt-4 text-sm text-gray-600">
             <select
               value={language}
               onChange={(e) => setLanguage(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="border-none outline-none bg-transparent cursor-pointer hover:text-gray-900"
               disabled={isGenerating}
             >
               <option value="sl">Slovenščina</option>
-              <option value="en">Angleščina</option>
+              <option value="en">English</option>
             </select>
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Način citiranja
-            </label>
+            
             <select
               value={citationStyle}
               onChange={(e) => setCitationStyle(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="border-none outline-none bg-transparent cursor-pointer hover:text-gray-900"
               disabled={isGenerating}
             >
-              <option value="APA">APA</option>
-              <option value="IEEE">IEEE</option>
+              <option value="APA">APA Style</option>
+              <option value="IEEE">IEEE Style</option>
             </select>
           </div>
         </div>
-      </div>
 
-      {/* Control Panel */}
-      <div className="bg-blue-50 rounded-lg p-4 mb-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-lg font-semibold text-blue-900 mb-1">Kontrola generiranja</h3>
-            {currentStep > 0 && (
-              <p className="text-sm text-blue-700">
-                Trenutno: {sections[currentStep - 1]?.slovenian} ({currentStep}/8)
-              </p>
-            )}
-          </div>
-          
-          <div className="flex gap-2">
+        {topic.trim() && (
+          <div className="flex items-center gap-3 mb-8 pb-4 border-b border-gray-100">
             {!isGenerating && !isPaused && (
               <button
                 onClick={generateAllSections}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-2"
-                disabled={!topic.trim()}
+                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-gray-900 rounded-md hover:bg-gray-800 transition-colors"
               >
                 <Play className="h-4 w-4" />
-                Generiraj članek
+                Generate Paper
               </button>
             )}
             
             {isGenerating && (
               <button
                 onClick={pauseGeneration}
-                className="px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 flex items-center gap-2"
+                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
               >
                 <Pause className="h-4 w-4" />
-                Prekini
+                Pause
               </button>
             )}
             
             {isPaused && currentStep > 0 && (
               <button
                 onClick={resumeGeneration}
-                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center gap-2"
+                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-gray-900 rounded-md hover:bg-gray-800 transition-colors"
               >
                 <Play className="h-4 w-4" />
-                Nadaljuj
+                Resume
               </button>
             )}
             
@@ -427,101 +388,102 @@ Return nothing except the formatted list.`
               <>
                 <button
                   onClick={resetGeneration}
-                  className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 flex items-center gap-2"
+                  className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
                 >
                   <RotateCcw className="h-4 w-4" />
-                  Ponastavi
+                  Reset
                 </button>
                 
                 <button
                   onClick={exportPaper}
-                  className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center gap-2"
+                  className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
                 >
                   <Download className="h-4 w-4" />
-                  Izvozi
+                  Export
                 </button>
               </>
             )}
-          </div>
-        </div>
-        
-        {/* Progress Bar */}
-        {(isGenerating || isPaused || progress > 0) && (
-          <div className="mt-4">
-            <div className="flex justify-between text-sm text-blue-700 mb-1">
-              <span>Napredek</span>
-              <span>{Math.round(progress)}%</span>
-            </div>
-            <div className="w-full bg-blue-200 rounded-full h-2">
-              <div
-                className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                style={{ width: `${progress}%` }}
-              ></div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Error Display */}
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-          <p className="text-red-800">{error}</p>
-        </div>
-      )}
-
-      {/* Generated Sections */}
-      <div className="space-y-4">
-        {sections.map((section) => (
-          <div key={section.id} className="border border-gray-200 rounded-lg">
-            <button
-              onClick={() => toggleSection(section.id)}
-              className={`w-full px-4 py-3 flex items-center justify-between text-left ${
-                generatedSections[section.id] 
-                  ? 'bg-green-50 hover:bg-green-100' 
-                  : currentStep === section.id 
-                    ? 'bg-blue-50 hover:bg-blue-100'
-                    : 'bg-gray-50 hover:bg-gray-100'
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ${
-                  generatedSections[section.id]
-                    ? 'bg-green-500 text-white'
-                    : currentStep === section.id
-                      ? 'bg-blue-500 text-white'
-                      : 'bg-gray-300 text-gray-600'
-                }`}>
-                  {section.id}
-                </div>
-                <div>
-                  <h3 className="font-semibold text-gray-900">{section.slovenian}</h3>
-                  <p className="text-sm text-gray-600">{section.length}</p>
-                </div>
-              </div>
-              
-              <div className="flex items-center gap-2">
-                {currentStep === section.id && isGenerating && (
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-                )}
-                {expandedSections[section.id] ? (
-                  <ChevronDown className="h-5 w-5 text-gray-400" />
-                ) : (
-                  <ChevronRight className="h-5 w-5 text-gray-400" />
-                )}
-              </div>
-            </button>
             
-            {expandedSections[section.id] && generatedSections[section.id] && (
-              <div className="px-4 py-4 border-t border-gray-200 bg-white">
-                <div className="prose max-w-none">
-                  <pre className="whitespace-pre-wrap font-sans text-sm text-gray-800 leading-relaxed">
-                    {generatedSections[section.id]}
-                  </pre>
-                </div>
+            {(isGenerating || isPaused) && (
+              <div className="flex items-center gap-2 text-sm text-gray-500">
+                {isGenerating && (
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-400"></div>
+                )}
+                <span>{Math.round(progress)}% complete</span>
               </div>
             )}
           </div>
-        ))}
+        )}
+
+        {error && (
+          <div className="mb-6 p-3 text-sm text-red-700 bg-red-50 rounded-md border border-red-100">
+            {error}
+          </div>
+        )}
+
+        <div className="space-y-1">
+          {sections.map((section) => (
+            <div key={section.id}>
+              <button
+                onClick={() => toggleSection(section.id)}
+                className={`w-full flex items-center gap-3 px-3 py-2 text-left rounded-md transition-colors group ${
+                  generatedSections[section.id] 
+                    ? 'hover:bg-gray-50' 
+                    : currentStep === section.id 
+                      ? 'bg-blue-50'
+                      : 'hover:bg-gray-50'
+                }`}
+              >
+                <div className="flex-shrink-0">
+                  {expandedSections[section.id] ? (
+                    <ChevronRight className="h-4 w-4 text-gray-400 rotate-90 transition-transform" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4 text-gray-400 transition-transform" />
+                  )}
+                </div>
+                
+                <div className="flex items-center gap-3 flex-1">
+                  <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                    generatedSections[section.id]
+                      ? 'bg-green-500'
+                      : currentStep === section.id
+                        ? 'bg-blue-500'
+                        : 'bg-gray-300'
+                  }`} />
+                  
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-gray-900">
+                        {section.id}. {section.slovenian}
+                      </span>
+                      {currentStep === section.id && isGenerating && (
+                        <div className="animate-spin rounded-full h-3 w-3 border-b border-blue-500"></div>
+                      )}
+                    </div>
+                    <div className="text-xs text-gray-500">{section.length}</div>
+                  </div>
+                </div>
+              </button>
+              
+              {expandedSections[section.id] && generatedSections[section.id] && (
+                <div className="ml-10 mt-2 mb-4">
+                  <div className="prose prose-sm max-w-none">
+                    <div className="p-4 bg-gray-50 rounded-md border border-gray-100">
+                      <pre className="whitespace-pre-wrap font-sans text-sm text-gray-800 leading-relaxed">
+                        {generatedSections[section.id]}
+                      </pre>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+          
+          <button className="w-full flex items-center gap-3 px-3 py-2 text-left rounded-md hover:bg-gray-50 transition-colors group opacity-50">
+            <Plus className="h-4 w-4 text-gray-400" />
+            <span className="text-sm text-gray-500">Add section</span>
+          </button>
+        </div>
       </div>
     </div>
   );

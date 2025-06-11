@@ -12,7 +12,7 @@ const ProfileSettings = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
-  
+
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -23,9 +23,9 @@ const ProfileSettings = () => {
     const getUser = async () => {
       try {
         const { data: { user }, error: userError } = await supabase.auth.getUser();
-        
+
         if (userError) throw userError;
-        
+
         setUser(user);
 
         if (user) {
@@ -41,7 +41,7 @@ const ProfileSettings = () => {
           }
 
           setProfile(profileData);
-          
+
           // Set form data with existing profile or user metadata
           setFormData({
             name: profileData?.name || user?.user_metadata?.name || '',
@@ -170,19 +170,19 @@ const ProfileSettings = () => {
         const { error: authError } = await supabase.auth.updateUser({
           data: metadataUpdate
         });
-        
+
         if (authError) console.warn('Auth metadata update failed:', authError);
       }
 
       setMessage({ type: 'success', text: 'Profile updated successfully!' });
-      
+
       // Refresh profile data
       const { data: updatedProfile } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', user.id)
         .single();
-      
+
       setProfile(updatedProfile);
 
     } catch (error) {
@@ -196,239 +196,162 @@ const ProfileSettings = () => {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+        <Loader2 className="w-8 h-8 animate-spin text-black-500" />
       </div>
     );
   }
 
+
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
-      {/* Profile Header */}
-      <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-        <div className="flex items-center space-x-4">
-          <div className="relative">
+    <div className="max-w-3xl mx-auto py-8 px-4">
+      <div className="mb-12">
+        <div className="flex items-center space-x-6 mb-8">
+          <div className="relative group">
             {formData.image ? (
               <img
                 src={formData.image}
                 alt="Profile"
-                className="w-16 h-16 rounded-full object-cover border-4 border-gray-100"
+                className="w-20 h-20 rounded-lg object-cover hover:opacity-80 transition-opacity"
               />
             ) : (
-              <div className="w-16 h-16 bg-gradient-to-br from-blue-400 to-purple-500 rounded-full flex items-center justify-center border-4 border-gray-100">
-                <span className="text-white font-semibold text-xl">
+              <div className="w-20 h-20 bg-gray-100 rounded-lg flex items-center justify-center hover:bg-gray-200 transition-colors">
+                <span className="text-gray-600 font-medium text-2xl">
                   {formData.name?.charAt(0)?.toUpperCase() || formData.email?.charAt(0)?.toUpperCase() || 'U'}
                 </span>
               </div>
             )}
+
+            <label className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-0 hover:bg-opacity-20 rounded-lg cursor-pointer transition-all duration-200 opacity-0 group-hover:opacity-100">
+              <Camera className="w-6 h-6 text-white" />
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleImageUpload}
+                disabled={isUploading}
+                className="hidden"
+              />
+            </label>
           </div>
+
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">
-              {formData.name || 'Unnamed User'}
-            </h2>
-            <p className="text-gray-600">{formData.email}</p>
-            {profile && (
-              <p className="text-sm text-gray-500 mt-1">
-                Member since {new Date(profile.created_at).toLocaleDateString()}
-              </p>
+            <h1 className="text-3xl font-medium text-gray-900 mb-1">
+              {formData.name || 'Untitled'}
+            </h1>
+            <p className="text-gray-500">{formData.email}</p>
+          </div>
+        </div>
+
+        {message.text && (
+          <div className={`text-sm px-0 py-2 ${message.type === 'success' ? 'text-green-600' : 'text-red-600'
+            }`}>
+            {message.text}
+          </div>
+        )}
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-8">
+        <div className="group">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Name
+          </label>
+          <input
+            type="text"
+            name="name"
+            value={formData.name}
+            onChange={handleInputChange}
+            placeholder="Enter your name"
+            className="w-full px-0 py-2 text-lg border-0 border-b border-transparent hover:border-gray-200 focus:border-gray-400 focus:outline-none focus:ring-0 bg-transparent transition-colors"
+          />
+        </div>
+
+        <div className="group">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Email
+          </label>
+          <input
+            type="email"
+            name="email"
+            value={formData.email}
+            onChange={handleInputChange}
+            placeholder="Enter your email"
+            className="w-full px-0 py-2 text-lg border-0 border-b border-transparent hover:border-gray-200 focus:border-gray-400 focus:outline-none focus:ring-0 bg-transparent transition-colors"
+          />
+          <p className="text-xs text-gray-400 mt-1">
+            Email changes may require verification
+          </p>
+        </div>
+
+        <div className="group">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Profile Image URL
+          </label>
+          <input
+            type="url"
+            name="image"
+            value={formData.image}
+            onChange={handleInputChange}
+            placeholder="Paste image URL"
+            className="w-full px-0 py-2 text-lg border-0 border-b border-transparent hover:border-gray-200 focus:border-gray-400 focus:outline-none focus:ring-0 bg-transparent transition-colors"
+          />
+          <div className="flex items-center space-x-4 mt-2">
+            <p className="text-xs text-gray-400">
+              Or upload an image (max 5MB)
+            </p>
+            {formData.image && (
+              <button
+                type="button"
+                onClick={handleRemoveImage}
+                className="text-xs text-red-500 hover:text-red-700 transition-colors"
+              >
+                Remove image
+              </button>
             )}
           </div>
         </div>
-      </div>
 
-      {/* Profile Form */}
-      <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-        <h3 className="text-lg font-semibold text-gray-900 mb-6">Edit Profile</h3>
-        
-        {message.text && (
-          <div className={`mb-6 p-4 rounded-lg flex items-center space-x-2 ${
-            message.type === 'success' 
-              ? 'bg-green-50 text-green-700 border border-green-200' 
-              : 'bg-red-50 text-red-700 border border-red-200'
-          }`}>
-            {message.type === 'success' ? (
-              <Check className="w-5 h-5" />
+        <div className="pt-8">
+          <button
+            type="submit"
+            disabled={isSaving}
+            className="inline-flex items-center px-6 py-2 text-sm font-medium text-white bg-gray-800 hover:bg-gray-900 disabled:bg-gray-400 rounded-md transition-colors duration-200"
+          >
+            {isSaving ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Saving
+              </>
             ) : (
-              <X className="w-5 h-5" />
+              <>
+                <Save className="w-4 h-4 mr-2" />
+                Save
+              </>
             )}
-            <span>{message.text}</span>
+          </button>
+        </div>
+      </form>
+
+      <div className="border-t border-gray-100 pt-12 mt-16">
+        <h3 className="text-sm font-medium text-gray-500 mb-6">Account Details</h3>
+        <div className="space-y-4 text-sm text-gray-600">
+          <div className="flex justify-between items-center">
+            <span>User ID</span>
+            <code className="text-xs font-mono bg-gray-50 px-2 py-1 rounded">
+              {user?.id?.slice(0, 8)}...
+            </code>
           </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Name Field */}
-          <div>
-            <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
-              Full Name
-            </label>
-            <div className="relative">
-              <User className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
-              <input
-                type="text"
-                id="name"
-                name="name"
-                value={formData.name}
-                onChange={handleInputChange}
-                placeholder="Enter your full name"
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-              />
-            </div>
-          </div>
-
-          {/* Email Field */}
-          <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-              Email Address
-            </label>
-            <div className="relative">
-              <Mail className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
-              <input
-                type="email"
-                id="email"
-                name="email"
-                value={formData.email}
-                onChange={handleInputChange}
-                placeholder="Enter your email address"
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-              />
-            </div>
-            <p className="text-sm text-gray-500 mt-1">
-              Note: Changing your email may require verification
-            </p>
-          </div>
-
-          {/* Profile Image Upload Section */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-4">
-              Profile Picture
-            </label>
-            
-            <div className="flex items-start space-x-6">
-              {/* Current Image Preview */}
-              <div className="flex-shrink-0">
-                {formData.image ? (
-                  <img
-                    src={formData.image}
-                    alt="Profile preview"
-                    className="w-24 h-24 rounded-full object-cover border-4 border-gray-100 shadow-sm"
-                  />
-                ) : (
-                  <div className="w-24 h-24 bg-gradient-to-br from-blue-400 to-purple-500 rounded-full flex items-center justify-center border-4 border-gray-100 shadow-sm">
-                    <span className="text-white font-semibold text-2xl">
-                      {formData.name?.charAt(0)?.toUpperCase() || formData.email?.charAt(0)?.toUpperCase() || 'U'}
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              {/* Upload Controls */}
-              <div className="flex-1 space-y-3">
-                <div className="flex flex-wrap gap-3">
-                  {/* Upload Button */}
-                  <label className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg cursor-pointer transition-colors duration-200">
-                    {isUploading ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Uploading...
-                      </>
-                    ) : (
-                      <>
-                        <Upload className="w-4 h-4 mr-2" />
-                        Upload New
-                      </>
-                    )}
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleImageUpload}
-                      disabled={isUploading}
-                      className="hidden"
-                    />
-                  </label>
-
-                  {/* Remove Button */}
-                  {formData.image && (
-                    <button
-                      type="button"
-                      onClick={handleRemoveImage}
-                      className="inline-flex items-center px-4 py-2 bg-red-100 hover:bg-red-200 text-red-700 font-medium rounded-lg transition-colors duration-200"
-                    >
-                      <Trash2 className="w-4 h-4 mr-2" />
-                      Remove
-                    </button>
-                  )}
-                </div>
-
-                <p className="text-sm text-gray-500">
-                  JPG, PNG or GIF. Max size 5MB. Recommended: 400x400px
-                </p>
-
-                {/* URL Input as Alternative */}
-                <div className="pt-2">
-                  <label htmlFor="image" className="block text-xs font-medium text-gray-600 mb-1">
-                    Or paste image URL:
-                  </label>
-                  <div className="relative">
-                    <Camera className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
-                    <input
-                      type="url"
-                      id="image"
-                      name="image"
-                      value={formData.image}
-                      onChange={handleInputChange}
-                      placeholder="https://example.com/image.jpg"
-                      className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Submit Button */}
-          <div className="pt-4">
-            <button
-              type="submit"
-              disabled={isSaving}
-              className="w-full flex items-center justify-center space-x-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium py-3 px-4 rounded-lg transition-colors duration-200"
-            >
-              {isSaving ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  <span>Saving...</span>
-                </>
-              ) : (
-                <>
-                  <Save className="w-5 h-5" />
-                  <span>Save Changes</span>
-                </>
-              )}
-            </button>
-          </div>
-        </form>
-      </div>
-
-      {/* Account Info */}
-      <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Account Information</h3>
-        <div className="space-y-3 text-sm">
-          <div className="flex justify-between">
-            <span className="text-gray-600">User ID:</span>
-            <span className="font-mono text-gray-900">{user?.id}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-gray-600">Account Status:</span>
-            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-              profile?.has_access 
-                ? 'bg-green-100 text-green-800' 
-                : 'bg-gray-100 text-gray-800'
-            }`}>
+          <div className="flex justify-between items-center">
+            <span>Status</span>
+            <span className={`text-xs px-2 py-1 rounded-full ${profile?.has_access
+                ? 'bg-green-50 text-green-700'
+                : 'bg-gray-50 text-gray-600'
+              }`}>
               {profile?.has_access ? 'Active' : 'Inactive'}
             </span>
           </div>
-          {profile?.customer_id && (
-            <div className="flex justify-between">
-              <span className="text-gray-600">Customer ID:</span>
-              <span className="font-mono text-gray-900">{profile.customer_id}</span>
+          {profile?.created_at && (
+            <div className="flex justify-between items-center">
+              <span>Member since</span>
+              <span>{new Date(profile.created_at).toLocaleDateString()}</span>
             </div>
           )}
         </div>
