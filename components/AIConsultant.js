@@ -138,8 +138,7 @@ When you reply:
                 <div className="px-6 py-4 bg-gray-50 border-b border-gray-100">
                     <p className="text-sm text-gray-600 mb-2">Selected text</p>
                     <div className="text-sm text-gray-800 italic leading-relaxed max-h-24 overflow-y-auto">
-                        "{selectedText}"
-                    </div>
+                        <div>&quot;{selectedText}&quot;</div>                    </div>
                 </div>
 
                 <div className="flex-1 overflow-hidden flex flex-col">
