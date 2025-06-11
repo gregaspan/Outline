@@ -50,7 +50,7 @@ function isHeading(type) {
 export default function Editor() {
     const [uploadResult, setUploadResult] = useState(null);
     const [blocks, setBlocks] = useState([]);
-    const [title, setTitle] = useState("Naslov");
+    const [title, setTitle] = useState("");
     const [currentBlockId, setCurrentBlockId] = useState(null);
     const [showBlockMenu, setShowBlockMenu] = useState(false);
     const [blockMenuPos, setBlockMenuPos] = useState({ top: 0, left: 0 });
@@ -802,344 +802,286 @@ Please provide 1-3 specific, actionable suggestions for improvement - do not wri
 
     const visibleBlocks = getVisibleBlocks();
 
-    return (
-        <div className="max-w-5xl mx-auto px-6 py-8">
+return (
+    <div className="min-h-screen bg-gray-50">
+        <div className="max-w-4xl mx-auto px-8 py-12">
             {/* Uploader */}
-            <DocumentUploader onResult={setUploadResult} />
+            <div className="mb-12">
+                <DocumentUploader onResult={setUploadResult} />
+            </div>
 
             {/* Internal Cover Page Info */}
             {uploadResult?.notranja_naslovna && (
-                <InternalCoverInfo info={uploadResult.notranja_naslovna} />
+                <div className="mb-8">
+                    <InternalCoverInfo info={uploadResult.notranja_naslovna} />
+                </div>
             )}
 
             {/* Summary */}
             {uploadResult && (
-                <ResultSummary
-                    frontMatter={uploadResult.front_matter_found}
-                    bodySections={uploadResult.body_sections_found}
-                />
+                <div className="mb-12">
+                    <ResultSummary
+                        frontMatter={uploadResult.front_matter_found}
+                        bodySections={uploadResult.body_sections_found}
+                    />
+                </div>
             )}
 
-                        <h1 className="text-3xl font-bold mt-6 mb-2 outline-none text-black">{title}</h1>
+            {/* Document Title */}
+            <div className="mb-8">
+                <h1 className="text-4xl font-semibold text-gray-900 outline-none border-none focus:ring-0 leading-tight">
+                    {title}
+                </h1>
+            </div>
 
-                        {/* Editor Blocks */}
-            <div className="space-y-3">
+            {/* Editor Blocks */}
+            <div className="space-y-1">
                 {visibleBlocks.map((block) => (
-                    <div key={block.id} className="group relative flex items-start">
-                        <div className="absolute -left-12 top-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center h-8 dropdown">
-                            <button tabIndex="0" className="btn btn-ghost btn-square btn-sm">
-                                <MoreHorizontal className="h-4 w-4" />
-                            </button>
-                            <ul
-                                tabIndex="0"
-                                className="dropdown-content menu p-2 shadow bg-base-100 rounded-box w-52"
-                            >
-                                <li>
-                                    <button onClick={() => changeBlockType(block.id, "paragraph")}>
-                                        ¶ Text
-                                    </button>
-                                </li>
-                                <li>
-                                    <button onClick={() => changeBlockType(block.id, "heading-1")}>
-                                        <Heading1 className="mr-2 h-4 w-4" /> H1
-                                    </button>
-                                </li>
-                                <li>
-                                    <button onClick={() => changeBlockType(block.id, "heading-2")}>
-                                        <Heading2 className="mr-2 h-4 w-4" /> H2
-                                    </button>
-                                </li>
-                                <li>
-                                    <button onClick={() => changeBlockType(block.id, "heading-3")}>
-                                        <span className="mr-2 text-lg">3</span> H3
-                                    </button>
-                                </li>
-                                <li>
-                                    <button onClick={() => changeBlockType(block.id, "caption")}>
-                                        <span className="mr-2 text-sm italic">❝</span> Caption
-                                    </button>
-                                </li>
-                            </ul>
+                    <div key={block.id} className="group relative">
+                        {/* Block Actions */}
+                        <div className="absolute -left-10 top-1 opacity-0 group-hover:opacity-100 transition-all duration-150 flex items-center">
+                            <div className="dropdown">
+                                <button 
+                                    tabIndex="0" 
+                                    className="w-6 h-6 flex items-center justify-center rounded hover:bg-gray-100 transition-colors"
+                                >
+                                    <MoreHorizontal className="h-4 w-4 text-gray-400" />
+                                </button>
+                                <ul
+                                    tabIndex="0"
+                                    className="dropdown-content menu p-2 shadow-lg bg-white rounded-lg border border-gray-200 w-48 z-10"
+                                >
+                                    <li>
+                                        <button 
+                                            onClick={() => changeBlockType(block.id, "paragraph")}
+                                            className="flex items-center text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                                        >
+                                            <span className="w-5 h-5 mr-3 flex items-center justify-center text-gray-500">¶</span>
+                                            Text
+                                        </button>
+                                    </li>
+                                    <li>
+                                        <button 
+                                            onClick={() => changeBlockType(block.id, "heading-1")}
+                                            className="flex items-center text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                                        >
+                                            <Heading1 className="w-5 h-5 mr-3 text-gray-500" />
+                                            Heading 1
+                                        </button>
+                                    </li>
+                                    <li>
+                                        <button 
+                                            onClick={() => changeBlockType(block.id, "heading-2")}
+                                            className="flex items-center text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                                        >
+                                            <Heading2 className="w-5 h-5 mr-3 text-gray-500" />
+                                            Heading 2
+                                        </button>
+                                    </li>
+                                    <li>
+                                        <button 
+                                            onClick={() => changeBlockType(block.id, "heading-3")}
+                                            className="flex items-center text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                                        >
+                                            <span className="w-5 h-5 mr-3 flex items-center justify-center text-gray-500 font-medium">H3</span>
+                                            Heading 3
+                                        </button>
+                                    </li>
+                                    <li>
+                                        <button 
+                                            onClick={() => changeBlockType(block.id, "caption")}
+                                            className="flex items-center text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                                        >
+                                            <span className="w-5 h-5 mr-3 flex items-center justify-center text-gray-500">❝</span>
+                                            Caption
+                                        </button>
+                                    </li>
+                                </ul>
+                            </div>
                         </div>
-                        <div className="flex-1">
+
+                        {/* Block Content */}
+                        <div className="min-h-[1.5rem] py-1">
                             {renderBlock(block)}
 
-                            {/* Suggestions Display */}
+                            {/* Suggestions */}
                             {isHeading(block.type) && suggestions[block.id] && (
-                                <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                                    <div className="flex items-center mb-2">
-                                        <Sparkles className="h-4 w-4 text-blue-500 mr-2" />
-                                        <h4 className="font-medium text-blue-800">
-                                            Predlogi za izboljsavo
-                                        </h4>
+                                <div className="mt-3 p-4 bg-blue-50/50 border-l-4 border-blue-200 rounded-r-lg">
+                                    <div className="flex items-start justify-between mb-2">
+                                        <div className="flex items-center">
+                                            <Sparkles className="h-4 w-4 text-blue-500 mr-2" />
+                                            <span className="font-medium text-blue-900 text-sm">Suggestions</span>
+                                        </div>
                                         <button
-                                            onClick={() =>
-                                                setSuggestions((prev) => {
-                                                    const newSuggestions = { ...prev };
-                                                    delete newSuggestions[block.id];
-                                                    return newSuggestions;
-                                                })
-                                            }
-                                            className="ml-auto text-blue-600 hover:text-blue-800 text-sm"
+                                            onClick={() => setSuggestions((prev) => {
+                                                const newSuggestions = { ...prev };
+                                                delete newSuggestions[block.id];
+                                                return newSuggestions;
+                                            })}
+                                            className="text-blue-400 hover:text-blue-600 transition-colors"
                                         >
-                                            ✕
+                                            <span className="text-lg">×</span>
                                         </button>
                                     </div>
-                                    <div className="text-sm text-blue-700 whitespace-pre-wrap">
+                                    <div className="text-sm text-blue-800 leading-relaxed whitespace-pre-wrap">
                                         {suggestions[block.id]}
                                     </div>
                                 </div>
                             )}
-                            {/* AI Detection Results - Comprehensive */}
-{detectionResults[block.id] && (
-    <div className="mt-4 p-4 bg-purple-50 border border-purple-200 rounded-lg">
-        <div className="flex items-center mb-3">
-            <Shield className="h-4 w-4 text-purple-500 mr-2" />
-            <h4 className="font-medium text-purple-800">
-                AI Content Detection Results
-            </h4>
-            <button
-                onClick={() =>
-                    setDetectionResults((prev) => {
-                        const newResults = { ...prev };
-                        delete newResults[block.id];
-                        return newResults;
-                    })
-                }
-                className="ml-auto text-purple-600 hover:text-purple-800 text-sm"
-            >
-                ✕
-            </button>
-        </div>
-        <div className="space-y-3 text-sm">
-            {/* Main Scores */}
-            <div className="grid grid-cols-2 gap-4">
-                <div className="bg-white p-3 rounded border">
-                    <p className="font-semibold text-purple-800">Overall AI Score</p>
-                    <p className="text-2xl font-bold text-purple-600">
-                        {detectionResults[block.id].score}%
-                    </p>
-                </div>
-                <div className="bg-white p-3 rounded border">
-                    <p className="font-semibold text-purple-800">Readability Score</p>
-                    <p className="text-2xl font-bold text-purple-600">
-                        {detectionResults[block.id].readability_score || 'N/A'}
-                    </p>
-                </div>
-            </div>
 
-            {/* Sentence Analysis */}
-            {detectionResults[block.id].sentences && Array.isArray(detectionResults[block.id].sentences) && (
-                <div className="bg-white p-3 rounded border">
-                    <p className="font-semibold text-purple-800 mb-2">Sentence-by-Sentence Analysis</p>
-                    <div className="max-h-40 overflow-y-auto space-y-2">
-                        {detectionResults[block.id].sentences.map((sentence, index) => (
-                            <div key={index} className="p-2 bg-gray-50 rounded text-xs">
-                                <div className="flex justify-between items-start mb-1">
-                                    <span className="font-medium">Sentence {index + 1}</span>
-                                    <span className={`px-2 py-1 rounded text-xs font-bold ${
-                                        sentence.score > 80 ? 'bg-red-100 text-red-800' :
-                                        sentence.score > 50 ? 'bg-yellow-100 text-yellow-800' :
-                                        'bg-green-100 text-green-800'
-                                    }`}>
-                                        {sentence.score}%
-                                    </span>
-                                </div>
-                                <p className="text-gray-700 leading-tight">
-                                    {sentence.text?.substring(0, 150)}{sentence.text?.length > 150 ? '...' : ''}
-                                </p>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
-        </div>
-    </div>
-)}
-
-{/* Plagiarism Results - Comprehensive */}
-{plagiarismResults[block.id] && (
-    <div className="mt-4 p-4 bg-orange-50 border border-orange-200 rounded-lg">
-        <div className="flex items-center mb-3">
-            <Search className="h-4 w-4 text-orange-500 mr-2" />
-            <h4 className="font-medium text-orange-800">
-                Plagiarism Check Results
-            </h4>
-            <button
-                onClick={() =>
-                    setPlagiarismResults((prev) => {
-                        const newResults = { ...prev };
-                        delete newResults[block.id];
-                        return newResults;
-                    })
-                }
-                className="ml-auto text-orange-600 hover:text-orange-800 text-sm"
-            >
-                ✕
-            </button>
-        </div>
-        <div className="space-y-3 text-sm">
-            {/* Main Score */}
-            <div className="bg-white p-3 rounded border text-center">
-                <p className="font-semibold text-orange-800">Plagiarism Score</p>
-                <p className={`text-3xl font-bold ${
-                    plagiarismResults[block.id].result?.score > 20 ? 'text-red-600' :
-                    plagiarismResults[block.id].result?.score > 10 ? 'text-yellow-600' :
-                    'text-green-600'
-                }`}>
-                    {plagiarismResults[block.id].result?.score || 0}%
-                </p>
-            </div>
-
-
-            {/* Detailed Statistics */}
-            {plagiarismResults[block.id].result && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div className="bg-white p-3 rounded border">
-                        <p className="font-semibold text-orange-800 mb-2">Word Statistics</p>
-                        <p><strong>Total Words:</strong> {plagiarismResults[block.id].result.textWordCounts}</p>
-                        <p><strong>Plagiarized Words:</strong> {plagiarismResults[block.id].result.totalPlagiarismWords}</p>
-                        <p><strong>Identical Words:</strong> {plagiarismResults[block.id].result.identicalWordCounts}</p>
-                        <p><strong>Similar Words:</strong> {plagiarismResults[block.id].result.similarWordCounts}</p>
-                    </div>
-                    <div className="bg-white p-3 rounded border">
-                        <p className="font-semibold text-orange-800 mb-2">Source Information</p>
-                        <p><strong>Sources Found:</strong> {plagiarismResults[block.id].result.sourceCounts || 0}</p>
-                    </div>
-                </div>
-            )}
-
-            {/* Sources */}
-            {plagiarismResults[block.id].sources && plagiarismResults[block.id].sources.length > 0 && (
-                <div className="bg-white p-3 rounded border">
-                    <p className="font-semibold text-orange-800 mb-2">Sources Found ({plagiarismResults[block.id].sources.length})</p>
-                    <div className="max-h-60 overflow-y-auto space-y-3">
-                        {plagiarismResults[block.id].sources.map((source, index) => (
-                            <div key={index} className="p-3 bg-gray-50 rounded border">
-                                <div className="flex justify-between items-start mb-2">
-                                    <div className="flex-1">
-                                        <p className="font-medium text-gray-800">
-                                            {source.title || 'Untitled Source'}
-                                        </p>
-                                        {source.url && (
-                                            <a 
-                                                href={source.url} 
-                                                target="_blank" 
-                                                rel="noopener noreferrer"
-                                                className="text-blue-600 hover:text-blue-800 text-xs break-all"
-                                            >
-                                                {source.url}
-                                            </a>
-                                        )}
-                                    </div>
-                                    <span className={`px-2 py-1 rounded text-xs font-bold ml-2 ${
-                                        source.score > 80 ? 'bg-red-100 text-red-800' :
-                                        source.score > 50 ? 'bg-yellow-100 text-yellow-800' :
-                                        'bg-orange-100 text-orange-800'
-                                    }`}>
-                                        {source.score}%
-                                    </span>
-                                </div>
-                                
-                                <div className="grid grid-cols-2 gap-2 text-xs text-gray-600 mb-2">
-                                    <p><strong>Plagiarized Words:</strong> {source.plagiarismWords}</p>
-                                    <p><strong>Total Words:</strong> {source.totalNumberOfWords}</p>
-                                    <p><strong>Identical:</strong> {source.identicalWordCounts}</p>
-                                    <p><strong>Similar:</strong> {source.similarWordCounts}</p>
-                                </div>
-
-                                {source.author && (
-                                    <p className="text-xs text-gray-600"><strong>Author:</strong> {source.author}</p>
-                                )}
-                                
-                                {source.description && (
-                                    <p className="text-xs text-gray-600 mt-1">
-                                        <strong>Description:</strong> {source.description.substring(0, 100)}
-                                        {source.description.length > 100 ? '...' : ''}
-                                    </p>
-                                )}
-
-                                {source.publishedDate && (
-                                    <p className="text-xs text-gray-600">
-                                        <strong>Published:</strong> {new Date(source.publishedDate).toLocaleDateString()}
-                                    </p>
-                                )}
-
-                                <div className="flex gap-2 mt-2">
-                                    {source.canAccess && (
-                                        <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded">Accessible</span>
-                                    )}
-                                    {source.citation && (
-                                        <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">Citation</span>
-                                    )}
-                                    {source.is_excluded && (
-                                        <span className="px-2 py-1 bg-gray-100 text-gray-800 text-xs rounded">Excluded</span>
-                                    )}
-                                </div>
-
-                                {/* Plagiarism Found Sequences */}
-                                {source.plagiarismFound && source.plagiarismFound.length > 0 && (
-                                    <details className="mt-2">
-                                        <summary className="text-xs font-medium cursor-pointer text-orange-700">
-                                            View Plagiarized Sequences ({source.plagiarismFound.length})
-                                        </summary>
-                                        <div className="mt-2 space-y-1 max-h-32 overflow-y-auto">
-                                            {source.plagiarismFound.map((seq, seqIndex) => (
-                                                <div key={seqIndex} className="bg-red-50 p-2 rounded text-xs">
-                                                    <p className="text-gray-600">
-                                                        <strong>Position:</strong> {seq.startIndex}-{seq.endIndex}
-                                                    </p>
-                                                    <p className="text-red-800 font-medium">
-                                                        &quot;{seq.sequence}&quot;                                                    </p>
-                                                </div>
-                                            ))}
+                            {/* AI Detection Results */}
+                            {detectionResults[block.id] && (
+                                <div className="mt-3 p-4 bg-purple-50/50 border-l-4 border-purple-200 rounded-r-lg">
+                                    <div className="flex items-start justify-between mb-3">
+                                        <div className="flex items-center">
+                                            <Shield className="h-4 w-4 text-purple-500 mr-2" />
+                                            <span className="font-medium text-purple-900 text-sm">AI Detection</span>
                                         </div>
-                                    </details>
-                                )}
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
+                                        <button
+                                            onClick={() => setDetectionResults((prev) => {
+                                                const newResults = { ...prev };
+                                                delete newResults[block.id];
+                                                return newResults;
+                                            })}
+                                            className="text-purple-400 hover:text-purple-600 transition-colors"
+                                        >
+                                            <span className="text-lg">×</span>
+                                        </button>
+                                    </div>
+                                    
+                                    <div className="grid grid-cols-2 gap-3 mb-4">
+                                        <div className="text-center">
+                                            <div className="text-2xl font-semibold text-purple-600">
+                                                {detectionResults[block.id].score}%
+                                            </div>
+                                            <div className="text-xs text-purple-600 font-medium">AI Score</div>
+                                        </div>
+                                        <div className="text-center">
+                                            <div className="text-2xl font-semibold text-purple-600">
+                                                {detectionResults[block.id].readability_score || 'N/A'}
+                                            </div>
+                                            <div className="text-xs text-purple-600 font-medium">Readability</div>
+                                        </div>
+                                    </div>
 
-            {/* Similar Words */}
-            {plagiarismResults[block.id].similarWords && plagiarismResults[block.id].similarWords.length > 0 && (
-                <details className="bg-white p-3 rounded border">
-                    <summary className="font-semibold text-orange-800 cursor-pointer">
-                        Similar Words ({plagiarismResults[block.id].similarWords.length})
-                    </summary>
-                    <div className="mt-2 max-h-32 overflow-y-auto">
-                        <div className="flex flex-wrap gap-1 text-xs">
-                            {plagiarismResults[block.id].similarWords.map((word, index) => (
-                                <span key={index} className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded">
-                                    {word.word} ({word.index})
-                                </span>
-                            ))}
-                        </div>
-                    </div>
-                </details>
-            )}
+                                    {detectionResults[block.id].sentences && Array.isArray(detectionResults[block.id].sentences) && (
+                                        <details className="group">
+                                            <summary className="cursor-pointer text-sm font-medium text-purple-700 hover:text-purple-800 mb-2">
+                                                Sentence Analysis ({detectionResults[block.id].sentences.length})
+                                            </summary>
+                                            <div className="max-h-32 overflow-y-auto space-y-2 pl-2">
+                                                {detectionResults[block.id].sentences.map((sentence, index) => (
+                                                    <div key={index} className="text-xs p-2 bg-white/60 rounded border-l-2 border-purple-100">
+                                                        <div className="flex justify-between items-center mb-1">
+                                                            <span className="font-medium text-purple-800">#{index + 1}</span>
+                                                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                                                                sentence.score > 80 ? 'bg-red-100 text-red-700' :
+                                                                sentence.score > 50 ? 'bg-yellow-100 text-yellow-700' :
+                                                                'bg-green-100 text-green-700'
+                                                            }`}>
+                                                                {sentence.score}%
+                                                            </span>
+                                                        </div>
+                                                        <p className="text-gray-600 leading-relaxed">
+                                                            {sentence.text?.substring(0, 100)}{sentence.text?.length > 100 ? '…' : ''}
+                                                        </p>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </details>
+                                    )}
+                                </div>
+                            )}
 
-            {/* Citations */}
-            {plagiarismResults[block.id].citations && plagiarismResults[block.id].citations.length > 0 && (
-                <details className="bg-white p-3 rounded border">
-                    <summary className="font-semibold text-orange-800 cursor-pointer">
-                        Citations ({plagiarismResults[block.id].citations.length})
-                    </summary>
-                    <div className="mt-2 space-y-1 max-h-32 overflow-y-auto text-xs">
-                        {plagiarismResults[block.id].citations.map((citation, index) => (
-                            <p key={index} className="p-2 bg-blue-50 rounded text-blue-800">
-                                {citation}
-                            </p>
-                        ))}
-                    </div>
-                </details>
-            )}
+                            {/* Plagiarism Results */}
+                            {plagiarismResults[block.id] && (
+                                <div className="mt-3 p-4 bg-orange-50/50 border-l-4 border-orange-200 rounded-r-lg">
+                                    <div className="flex items-start justify-between mb-3">
+                                        <div className="flex items-center">
+                                            <Search className="h-4 w-4 text-orange-500 mr-2" />
+                                            <span className="font-medium text-orange-900 text-sm">Plagiarism Check</span>
+                                        </div>
+                                        <button
+                                            onClick={() => setPlagiarismResults((prev) => {
+                                                const newResults = { ...prev };
+                                                delete newResults[block.id];
+                                                return newResults;
+                                            })}
+                                            className="text-orange-400 hover:text-orange-600 transition-colors"
+                                        >
+                                            <span className="text-lg">×</span>
+                                        </button>
+                                    </div>
 
-           
-        </div>
-    </div>
-)}
+                                    <div className="text-center mb-4">
+                                        <div className={`text-3xl font-semibold ${
+                                            plagiarismResults[block.id].result?.score > 20 ? 'text-red-600' :
+                                            plagiarismResults[block.id].result?.score > 10 ? 'text-yellow-600' :
+                                            'text-green-600'
+                                        }`}>
+                                            {plagiarismResults[block.id].result?.score || 0}%
+                                        </div>
+                                        <div className="text-xs text-orange-600 font-medium">Plagiarism Score</div>
+                                    </div>
+
+                                    {plagiarismResults[block.id].result && (
+                                        <div className="grid grid-cols-2 gap-3 text-xs mb-3">
+                                            <div className="bg-white/60 p-2 rounded">
+                                                <div className="font-medium text-orange-800 mb-1">Word Stats</div>
+                                                <div className="space-y-0.5 text-gray-600">
+                                                    <div>Total: {plagiarismResults[block.id].result.textWordCounts}</div>
+                                                    <div>Plagiarized: {plagiarismResults[block.id].result.totalPlagiarismWords}</div>
+                                                </div>
+                                            </div>
+                                            <div className="bg-white/60 p-2 rounded">
+                                                <div className="font-medium text-orange-800 mb-1">Sources</div>
+                                                <div className="text-gray-600">
+                                                    Found: {plagiarismResults[block.id].result.sourceCounts || 0}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {plagiarismResults[block.id].sources && plagiarismResults[block.id].sources.length > 0 && (
+                                        <details className="group">
+                                            <summary className="cursor-pointer text-sm font-medium text-orange-700 hover:text-orange-800">
+                                                View Sources ({plagiarismResults[block.id].sources.length})
+                                            </summary>
+                                            <div className="mt-2 space-y-2 max-h-40 overflow-y-auto pl-2">
+                                                {plagiarismResults[block.id].sources.map((source, index) => (
+                                                    <div key={index} className="p-2 bg-white/60 rounded border-l-2 border-orange-100">
+                                                        <div className="flex justify-between items-start mb-1">
+                                                            <div className="text-xs font-medium text-gray-800 flex-1 mr-2">
+                                                                {source.title || 'Untitled Source'}
+                                                            </div>
+                                                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                                                                source.score > 80 ? 'bg-red-100 text-red-700' :
+                                                                source.score > 50 ? 'bg-yellow-100 text-yellow-700' :
+                                                                'bg-orange-100 text-orange-700'
+                                                            }`}>
+                                                                {source.score}%
+                                                            </span>
+                                                        </div>
+                                                        {source.url && (
+                                                            <a 
+                                                                href={source.url} 
+                                                                target="_blank" 
+                                                                rel="noopener noreferrer"
+                                                                className="text-blue-600 hover:text-blue-700 text-xs break-all block mb-1"
+                                                            >
+                                                                {source.url.substring(0, 60)}{source.url.length > 60 ? '…' : ''}
+                                                            </a>
+                                                        )}
+                                                        <div className="text-xs text-gray-500">
+                                                            {source.plagiarismWords} / {source.totalNumberOfWords} words
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </details>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     </div>
                 ))}
@@ -1148,7 +1090,7 @@ Please provide 1-3 specific, actionable suggestions for improvement - do not wri
             {/* Context Menu */}
             {showContextMenu && (
                 <div
-                    className="fixed bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-50"
+                    className="fixed bg-white rounded-lg shadow-xl border border-gray-200 py-2 z-50 min-w-36"
                     style={{
                         left: contextMenuPos.x,
                         top: contextMenuPos.y,
@@ -1158,25 +1100,25 @@ Please provide 1-3 specific, actionable suggestions for improvement - do not wri
                 >
                     <button
                         onClick={handleCopy}
-                        className="flex items-center w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                        className="flex items-center w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                     >
-                        <Copy className="h-4 w-4 mr-2" />
-                        Kopiraj
+                        <Copy className="h-4 w-4 mr-3 text-gray-400" />
+                        Copy
                     </button>
                     <button
                         onClick={handlePaste}
-                        className="flex items-center w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                        className="flex items-center w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                     >
-                        <Clipboard className="h-4 w-4 mr-2" />
-                        Prilepi
+                        <Clipboard className="h-4 w-4 mr-3 text-gray-400" />
+                        Paste
                     </button>
-                    <hr className="my-1 border-gray-200" />
+                    <div className="h-px bg-gray-200 my-1" />
                     <button
                         onClick={handleAIConsultant}
                         className="flex items-center w-full px-3 py-2 text-sm text-blue-700 hover:bg-blue-50 transition-colors"
                     >
-                        <Brain className="h-4 w-4 mr-2" />
-                        AI Svetovalec
+                        <Brain className="h-4 w-4 mr-3 text-blue-500" />
+                        AI Assistant
                     </button>
                 </div>
             )}
@@ -1198,5 +1140,6 @@ Please provide 1-3 specific, actionable suggestions for improvement - do not wri
                 onClose={() => setShowConsultant(false)}
             />
         </div>
-    );
+    </div>
+);
 }

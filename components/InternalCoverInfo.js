@@ -15,32 +15,29 @@ export default function InternalCoverInfo({ info }) {
     lektor,
   } = info;
 
-  const getIcon = (field) => {
+  const getEmoji = (field) => {
     switch (field) {
-      case 'title':
-        return <FileText className="h-4 w-4 text-gray-400" />;
       case 'type':
-        return <BookOpen className="h-4 w-4 text-gray-400" />;
+        return '📄';
       case 'student':
-        return <GraduationCap className="h-4 w-4 text-gray-400" />;
+        return '🎓';
       case 'program':
-        return <BookOpen className="h-4 w-4 text-gray-400" />;
+        return '📚';
       case 'smer':
-        return <BookOpen className="h-4 w-4 text-gray-400" />;
+        return '🎯';
       case 'mentor':
-        return <UserCheck className="h-4 w-4 text-gray-400" />;
+        return '👨‍🏫';
       case 'somentor':
-        return <Users className="h-4 w-4 text-gray-400" />;
+        return '👥';
       case 'lektor':
-        return <Pencil className="h-4 w-4 text-gray-400" />;
+        return '✏️';
       default:
-        return <User className="h-4 w-4 text-gray-400" />;
+        return '👤';
     }
   };
 
   const getLabel = (field) => {
     const labels = {
-      title: 'Naslov dela',
       type: 'Vrsta dela',
       student: 'Študent(ka)',
       program: 'Študijski program',
@@ -63,35 +60,44 @@ export default function InternalCoverInfo({ info }) {
   ].filter(field => field.value);
 
   return (
-    <div className="max-w-4xl mx-auto bg-white">
-      <div className="mb-12">
-        <h1 className="text-4xl font-bold text-gray-900 mb-2 leading-tight">
-          {title || "Notranja naslovna stran"}
-        </h1>
-        <div className="w-16 h-1 bg-gray-200 rounded-full"></div>
-      </div>
+    <div className="mb-12 pb-8 border-b border-gray-100">
+      {/* Title */}
+      {title && (
+        <div className="mb-8">
+          <h2 className="text-3xl font-bold text-gray-900 mb-2 leading-tight">
+            {title}
+          </h2>
+        </div>
+      )}
 
-      <div className="space-y-8">
-        {fields.map((field, index) => (
-          <div key={field.key} className="group">
-            <div className="flex items-start gap-4 py-3 hover:bg-gray-50 -mx-2 px-2 rounded-md transition-colors duration-150">
-              <div className="flex-shrink-0 mt-1.5">
-                {getIcon(field.key)}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium text-gray-500 mb-1">
+      {/* Properties */}
+      <div className="space-y-3">
+        {fields.map((field) => (
+          <div 
+            key={field.key} 
+            className="flex items-center py-1 hover:bg-gray-50 rounded px-2 -mx-2 transition-colors duration-150"
+          >
+            <div className="flex items-center min-w-0 flex-1">
+              <span className="text-lg mr-3 flex-shrink-0">
+                {getEmoji(field.key)}
+              </span>
+              <div className="flex items-center min-w-0 flex-1">
+                <span className="text-sm text-gray-500 mr-8 flex-shrink-0 w-32">
                   {getLabel(field.key)}
-                </div>
-                <div className="text-base text-gray-900 leading-relaxed">
+                </span>
+                <span className="text-sm text-gray-900 min-w-0 flex-1">
                   {field.value}
-                </div>
+                </span>
               </div>
             </div>
-            {index < fields.length - 1 && (
-              <div className="border-b border-gray-100 mt-3 ml-8"></div>
-            )}
           </div>
         ))}
+      </div>
+
+      {/* Subtle indicator */}
+      <div className="mt-6 flex items-center text-xs text-gray-400">
+        <div className="w-1.5 h-1.5 bg-green-400 rounded-full mr-2"></div>
+        Document metadata
       </div>
     </div>
   );
