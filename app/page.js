@@ -32,19 +32,20 @@ export default function Page() {
               <div className="w-16 h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent mx-auto"></div>
               
               <p className="text-xl md:text-2xl text-gray-600 font-light leading-relaxed max-w-2xl mx-auto">
-                Simple, powerful, and beautifully designed
+Outline helps Slovenian-speaking students streamline thesis writing by automatically validating document structure, analyzing content, and providing AI-driven feedback.
+
               </p>
             </div>
 
             {/* CTA Section */}
             <div className="pt-8">
               <a
-                href="https://outline-api.onrender.com/docs"
+                href="https://outline-1.gitbook.io/outline"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="group inline-flex items-center gap-3 px-8 py-4 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-all duration-300 transform hover:scale-105 hover:shadow-lg text-lg font-medium"
               >
-                Explore API
+                Learn More
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   viewBox="0 0 20 20"
