@@ -54,6 +54,17 @@ function isHeading(type) {
     return ["heading-1", "heading-2", "heading-3"].includes(type);
 }
 
+// Feedback options for suggestion ratings
+const feedbackOptions = [
+    { id: 'helpful', label: 'Helpful', icon: '👍' },
+    { id: 'unclear', label: 'Unclear', icon: '❓' },
+    { id: 'irrelevant', label: 'Irrelevant', icon: '❌' },
+    { id: 'too_general', label: 'Too General', icon: '🌐' },
+    { id: 'too_specific', label: 'Too Specific', icon: '🎯' },
+    { id: 'good_style', label: 'Good Style', icon: '✨' },
+    { id: 'needs_improvement', label: 'Needs Improvement', icon: '🔧' }
+];
+
 export default function Editor() {
     const [uploadResult, setUploadResult] = useState(null);
     const [blocks, setBlocks] = useState([]);
