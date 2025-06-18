@@ -9,6 +9,13 @@ import DocumentUploader from "./DocumentUploader";
 import ResultSummary from "./ResultSummary";
 import InternalCoverInfo from "./InternalCoverInfo";
 import AIConsultant from "./AIConsultant";
+import { createClient } from '@supabase/supabase-js';
+
+// Initialize Supabase client
+const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+);
 
 // Utility: map Word styles to block types
 function mapStyleToType(style) {
@@ -58,6 +65,9 @@ export default function Editor() {
     const [collapsedHeadings, setCollapsedHeadings] = useState(new Set());
     const [loadingSuggestions, setLoadingSuggestions] = useState(new Set());
     const [suggestions, setSuggestions] = useState({});
+    const [suggestionFeedback, setSuggestionFeedback] = useState({});
+    const [suggestionModels, setSuggestionModels] = useState({});
+    const [showFeedbackModal, setShowFeedbackModal] = useState(null);
 
     const [selectedText, setSelectedText] = useState("");
     const [showConsultant, setShowConsultant] = useState(false);
@@ -75,6 +85,25 @@ export default function Editor() {
     const [plagiarismResults, setPlagiarismResults] = useState({});
 
     const refs = useRef({});
+    const availableModels = [
+        "openai/o1",
+        "openai/gpt-4o",
+        "anthropic/claude-sonnet-4",
+        "anthropic/claude-opus-4",
+        "deepseek/deepseek-r1",
+        "deepseek/deepseek-chat",
+        "google/gemini-2.5-pro",
+        "google/gemini-2.5-flash",
+        "perplexity/sonar",
+        "perplexity/sonar-pro"
+    ];
+
+    const getRandomModel = () => {
+        const randomIndex = Math.floor(Math.random() * availableModels.length);
+        const selectedModel = availableModels[randomIndex];
+        console.log('Using model:', selectedModel);
+        return selectedModel;
+    };
 
     useEffect(() => {
         if (uploadResult?.notranja_naslovna?.title) {
@@ -352,6 +381,76 @@ export default function Editor() {
         };
     };
 
+    const handleSuggestionFeedback = async (blockId, rating) => {
+        setSuggestionFeedback(prev => ({
+            ...prev,
+            [blockId]: { rating }
+        }));
+
+        const block = blocks.find(b => b.id === blockId);
+        const chapterContent = getChapterContent(blockId);
+        const formattedContent = chapterContent.blocks
+            .map((block) => {
+                switch (block.type) {
+                    case "heading-1":
+                    case "heading-2":
+                    case "heading-3":
+                        return `# ${block.content}`;
+                    case "caption":
+                        return `*${block.content}*`;
+                    default:
+                        return block.content;
+                }
+            })
+            .filter((content) => content.trim())
+            .join("\n\n");
+
+        const prompt = `Please analyze the following chapter and provide specific, actionable improvement suggestions. Focus on:
+1. Content clarity and structure
+2. Writing style and flow
+3. Missing information or gaps
+4. Better organization of ideas
+5. Engagement and readability
+
+Chapter content:
+${formattedContent}
+
+Please provide only 1 specific, actionable suggestions for improvement - do not write anything else. Write in slovenian language. Only format the text using break lines - add one after each suggestion, no other formatting. Do not try to make any text bold or italic.`;
+
+        // Log to console
+        console.log({
+            text: suggestions[blockId],
+            model: suggestionModels[blockId],
+            feedback: {
+                rating
+            },
+            prompt: prompt
+        });
+
+        // Save to Supabase
+        try {
+            const { data, error } = await supabase
+                .from('suggestion_feedback')
+                .insert([
+                    {
+                        block_id: blockId,
+                        suggestion_text: suggestions[blockId],
+                        model: suggestionModels[blockId],
+                        rating: rating,
+                        prompt: prompt
+                    }
+                ]);
+
+            if (error) {
+                console.error('Error saving feedback to Supabase:', error);
+            } else {
+                console.log('Feedback saved successfully:', data);
+            }
+        } catch (error) {
+            console.error('Error saving feedback:', error);
+        }
+    };
+
     const suggestImprovements = async (headingId) => {
         const chapterContent = getChapterContent(headingId);
         if (!chapterContent) return;
@@ -375,19 +474,17 @@ export default function Editor() {
                 .filter((content) => content.trim())
                 .join("\n\n");
 
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${process.env.NEXT_PUBLIC_GEMINI_API_KEY}`;
+            const selectedModel = getRandomModel();
+            setSuggestionModels(prev => ({
+                ...prev,
+                [headingId]: selectedModel
+            }));
 
-            const response = await fetch(url, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    contents: [
-                        {
-                            parts: [
-                                {
-                                    text: `Please analyze the following chapter and provide specific, actionable improvement suggestions. Focus on:
+            const payload = {
+                "model": selectedModel,
+                "messages": [{
+                    "role": "user",
+                    "content": `Please analyze the following chapter and provide specific, actionable improvement suggestions. Focus on:
 1. Content clarity and structure
 2. Writing style and flow
 3. Missing information or gaps
@@ -397,18 +494,16 @@ export default function Editor() {
 Chapter content:
 ${formattedContent}
 
-Please provide 1-3 specific, actionable suggestions for improvement - do not write anything else. Write in slovenian language. Only format the text using break lines - add one after each suggestion, no other formatting. Do not try to make any text bold or italic.`,
-                                },
-                            ],
-                        },
-                    ],
-                    generationConfig: {
-                        temperature: 0.7,
-                        topK: 40,
-                        topP: 0.95,
-                        maxOutputTokens: 1024,
-                    },
-                }),
+Please provide only 1 specific, actionable suggestions for improvement - do not write anything else. Write in slovenian language. Only format the text using break lines - add one after each suggestion, no other formatting. Do not try to make any text bold or italic.`
+                }]
+            };
+
+            const response = await fetch('/api/suggestions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
             });
 
             if (!response.ok) {
@@ -416,9 +511,7 @@ Please provide 1-3 specific, actionable suggestions for improvement - do not wri
             }
 
             const data = await response.json();
-            const suggestionText =
-                data.candidates?.[0]?.content?.parts?.[0]?.text ||
-                "No suggestions available.";
+            const suggestionText = data.choices[0].message.content;
 
             setSuggestions((prev) => ({
                 ...prev,
@@ -429,7 +522,7 @@ Please provide 1-3 specific, actionable suggestions for improvement - do not wri
             setSuggestions((prev) => ({
                 ...prev,
                 [headingId]:
-                    "Error getting suggestions. Please check your API key and try again.",
+                    "Error getting suggestions. Please check your API configuration and try again.",
             }));
         } finally {
             setLoadingSuggestions((prev) => {
@@ -802,344 +895,447 @@ Please provide 1-3 specific, actionable suggestions for improvement - do not wri
 
     const visibleBlocks = getVisibleBlocks();
 
-return (
-    <div className="min-h-screen bg-gray-50">
-        <div className="max-w-4xl mx-auto px-8 py-12">
-            {/* Uploader */}
-            <div className="mb-12">
-                <DocumentUploader onResult={setUploadResult} />
-            </div>
-
-            {/* Internal Cover Page Info */}
-            {uploadResult?.notranja_naslovna && (
-                <div className="mb-8">
-                    <InternalCoverInfo info={uploadResult.notranja_naslovna} />
-                </div>
-            )}
-
-            {/* Summary */}
-            {uploadResult && (
+    return (
+        <div className="min-h-screen bg-gray-50">
+            <div className="max-w-4xl mx-auto px-8 py-12">
+                {/* Uploader */}
                 <div className="mb-12">
-                    <ResultSummary
-                        frontMatter={uploadResult.front_matter_found}
-                        bodySections={uploadResult.body_sections_found}
-                    />
+                    <DocumentUploader onResult={setUploadResult} />
                 </div>
-            )}
 
-            {/* Document Title */}
-            <div className="mb-8">
-                <h1 className="text-4xl font-semibold text-gray-900 outline-none border-none focus:ring-0 leading-tight">
-                    {title}
-                </h1>
-            </div>
+                {/* Internal Cover Page Info */}
+                {uploadResult?.notranja_naslovna && (
+                    <div className="mb-8">
+                        <InternalCoverInfo info={uploadResult.notranja_naslovna} />
+                    </div>
+                )}
 
-            {/* Editor Blocks */}
-            <div className="space-y-1">
-                {visibleBlocks.map((block) => (
-                    <div key={block.id} className="group relative">
-                        {/* Block Actions */}
-                        <div className="absolute -left-10 top-1 opacity-0 group-hover:opacity-100 transition-all duration-150 flex items-center">
-                            <div className="dropdown">
-                                <button 
-                                    tabIndex="0" 
-                                    className="w-6 h-6 flex items-center justify-center rounded hover:bg-gray-100 transition-colors"
-                                >
-                                    <MoreHorizontal className="h-4 w-4 text-gray-400" />
-                                </button>
-                                <ul
-                                    tabIndex="0"
-                                    className="dropdown-content menu p-2 shadow-lg bg-white rounded-lg border border-gray-200 w-48 z-10"
-                                >
-                                    <li>
-                                        <button 
-                                            onClick={() => changeBlockType(block.id, "paragraph")}
-                                            className="flex items-center text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                                        >
-                                            <span className="w-5 h-5 mr-3 flex items-center justify-center text-gray-500">¶</span>
-                                            Text
-                                        </button>
-                                    </li>
-                                    <li>
-                                        <button 
-                                            onClick={() => changeBlockType(block.id, "heading-1")}
-                                            className="flex items-center text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                                        >
-                                            <Heading1 className="w-5 h-5 mr-3 text-gray-500" />
-                                            Heading 1
-                                        </button>
-                                    </li>
-                                    <li>
-                                        <button 
-                                            onClick={() => changeBlockType(block.id, "heading-2")}
-                                            className="flex items-center text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                                        >
-                                            <Heading2 className="w-5 h-5 mr-3 text-gray-500" />
-                                            Heading 2
-                                        </button>
-                                    </li>
-                                    <li>
-                                        <button 
-                                            onClick={() => changeBlockType(block.id, "heading-3")}
-                                            className="flex items-center text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                                        >
-                                            <span className="w-5 h-5 mr-3 flex items-center justify-center text-gray-500 font-medium">H3</span>
-                                            Heading 3
-                                        </button>
-                                    </li>
-                                    <li>
-                                        <button 
-                                            onClick={() => changeBlockType(block.id, "caption")}
-                                            className="flex items-center text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                                        >
-                                            <span className="w-5 h-5 mr-3 flex items-center justify-center text-gray-500">❝</span>
-                                            Caption
-                                        </button>
-                                    </li>
-                                </ul>
+                {/* Summary */}
+                {uploadResult && (
+                    <div className="mb-12">
+                        <ResultSummary
+                            frontMatter={uploadResult.front_matter_found}
+                            bodySections={uploadResult.body_sections_found}
+                        />
+                    </div>
+                )}
+
+                {/* Document Title */}
+                <div className="mb-8">
+                    <h1 className="text-4xl font-semibold text-gray-900 outline-none border-none focus:ring-0 leading-tight">
+                        {title}
+                    </h1>
+                </div>
+
+                {/* Editor Blocks */}
+                <div className="space-y-1">
+                    {visibleBlocks.map((block) => (
+                        <div key={block.id} className="group relative">
+                            {/* Block Actions */}
+                            <div className="absolute -left-10 top-1 opacity-0 group-hover:opacity-100 transition-all duration-150 flex items-center">
+                                <div className="dropdown">
+                                    <button 
+                                        tabIndex="0" 
+                                        className="w-6 h-6 flex items-center justify-center rounded hover:bg-gray-100 transition-colors"
+                                    >
+                                        <MoreHorizontal className="h-4 w-4 text-gray-400" />
+                                    </button>
+                                    <ul
+                                        tabIndex="0"
+                                        className="dropdown-content menu p-2 shadow-lg bg-white rounded-lg border border-gray-200 w-48 z-10"
+                                    >
+                                        <li>
+                                            <button 
+                                                onClick={() => changeBlockType(block.id, "paragraph")}
+                                                className="flex items-center text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                                            >
+                                                <span className="w-5 h-5 mr-3 flex items-center justify-center text-gray-500">¶</span>
+                                                Text
+                                            </button>
+                                        </li>
+                                        <li>
+                                            <button 
+                                                onClick={() => changeBlockType(block.id, "heading-1")}
+                                                className="flex items-center text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                                            >
+                                                <Heading1 className="w-5 h-5 mr-3 text-gray-500" />
+                                                Heading 1
+                                            </button>
+                                        </li>
+                                        <li>
+                                            <button 
+                                                onClick={() => changeBlockType(block.id, "heading-2")}
+                                                className="flex items-center text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                                            >
+                                                <Heading2 className="w-5 h-5 mr-3 text-gray-500" />
+                                                Heading 2
+                                            </button>
+                                        </li>
+                                        <li>
+                                            <button 
+                                                onClick={() => changeBlockType(block.id, "heading-3")}
+                                                className="flex items-center text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                                            >
+                                                <span className="w-5 h-5 mr-3 flex items-center justify-center text-gray-500 font-medium">H3</span>
+                                                Heading 3
+                                            </button>
+                                        </li>
+                                        <li>
+                                            <button 
+                                                onClick={() => changeBlockType(block.id, "caption")}
+                                                className="flex items-center text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                                            >
+                                                <span className="w-5 h-5 mr-3 flex items-center justify-center text-gray-500">❝</span>
+                                                Caption
+                                            </button>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+
+                            {/* Block Content */}
+                            <div className="min-h-[1.5rem] py-1">
+                                {renderBlock(block)}
+
+                                {/* Suggestions */}
+                                {isHeading(block.type) && suggestions[block.id] && (
+                                    <div className="mt-3 p-4 bg-blue-50/50 border-l-4 border-blue-200 rounded-r-lg">
+                                        <div className="flex items-start justify-between mb-2">
+                                            <div className="flex items-center">
+                                                <Sparkles className="h-4 w-4 text-blue-500 mr-2" />
+                                                <span className="font-medium text-blue-900 text-sm">Suggestions</span>
+                                            </div>
+                                            <div className="flex items-center space-x-2">
+                                                <button
+                                                    onClick={() => setSuggestions((prev) => {
+                                                        const newSuggestions = { ...prev };
+                                                        delete newSuggestions[block.id];
+                                                        return newSuggestions;
+                                                    })}
+                                                    className="text-blue-400 hover:text-blue-600 transition-colors"
+                                                >
+                                                    <span className="text-lg">×</span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div className="text-sm text-blue-800 leading-relaxed whitespace-pre-wrap mb-3">
+                                            {suggestions[block.id]}
+                                        </div>
+                                        <div className="flex items-center space-x-1">
+                                            <span className="text-xs text-gray-500 mr-2">Rate this suggestion:</span>
+                                            {[1, 2, 3, 4, 5].map((rating) => (
+                                                <button
+                                                    key={rating}
+                                                    onClick={() => handleSuggestionFeedback(block.id, rating)}
+                                                    className={`w-6 h-6 rounded-full flex items-center justify-center text-xs transition-colors ${
+                                                        suggestionFeedback[block.id]?.rating === rating
+                                                            ? 'bg-blue-100 text-blue-600'
+                                                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                                    }`}
+                                                >
+                                                    {rating}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* AI Detection Results */}
+                                {detectionResults[block.id] && (
+                                    <div className="mt-3 p-4 bg-purple-50/50 border-l-4 border-purple-200 rounded-r-lg">
+                                        <div className="flex items-start justify-between mb-3">
+                                            <div className="flex items-center">
+                                                <Shield className="h-4 w-4 text-purple-500 mr-2" />
+                                                <span className="font-medium text-purple-900 text-sm">AI Detection</span>
+                                            </div>
+                                            <button
+                                                onClick={() => setDetectionResults((prev) => {
+                                                    const newResults = { ...prev };
+                                                    delete newResults[block.id];
+                                                    return newResults;
+                                                })}
+                                                className="text-purple-400 hover:text-purple-600 transition-colors"
+                                            >
+                                                <span className="text-lg">×</span>
+                                            </button>
+                                        </div>
+                                        
+                                        <div className="grid grid-cols-2 gap-3 mb-4">
+                                            <div className="text-center">
+                                                <div className="text-2xl font-semibold text-purple-600">
+                                                    {detectionResults[block.id].score}%
+                                                </div>
+                                                <div className="text-xs text-purple-600 font-medium">AI Score</div>
+                                            </div>
+                                            <div className="text-center">
+                                                <div className="text-2xl font-semibold text-purple-600">
+                                                    {detectionResults[block.id].readability_score || 'N/A'}
+                                                </div>
+                                                <div className="text-xs text-purple-600 font-medium">Readability</div>
+                                            </div>
+                                        </div>
+
+                                        {detectionResults[block.id].sentences && Array.isArray(detectionResults[block.id].sentences) && (
+                                            <details className="group">
+                                                <summary className="cursor-pointer text-sm font-medium text-purple-700 hover:text-purple-800 mb-2">
+                                                    Sentence Analysis ({detectionResults[block.id].sentences.length})
+                                                </summary>
+                                                <div className="max-h-32 overflow-y-auto space-y-2 pl-2">
+                                                    {detectionResults[block.id].sentences.map((sentence, index) => (
+                                                        <div key={index} className="text-xs p-2 bg-white/60 rounded border-l-2 border-purple-100">
+                                                            <div className="flex justify-between items-center mb-1">
+                                                                <span className="font-medium text-purple-800">#{index + 1}</span>
+                                                                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                                                                    sentence.score > 80 ? 'bg-red-100 text-red-700' :
+                                                                    sentence.score > 50 ? 'bg-yellow-100 text-yellow-700' :
+                                                                    'bg-green-100 text-green-700'
+                                                                }`}>
+                                                                    {sentence.score}%
+                                                                </span>
+                                                            </div>
+                                                            <p className="text-gray-600 leading-relaxed">
+                                                                {sentence.text?.substring(0, 100)}{sentence.text?.length > 100 ? '…' : ''}
+                                                            </p>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </details>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* Plagiarism Results */}
+                                {plagiarismResults[block.id] && (
+                                    <div className="mt-3 p-4 bg-orange-50/50 border-l-4 border-orange-200 rounded-r-lg">
+                                        <div className="flex items-start justify-between mb-3">
+                                            <div className="flex items-center">
+                                                <Search className="h-4 w-4 text-orange-500 mr-2" />
+                                                <span className="font-medium text-orange-900 text-sm">Plagiarism Check</span>
+                                            </div>
+                                            <button
+                                                onClick={() => setPlagiarismResults((prev) => {
+                                                    const newResults = { ...prev };
+                                                    delete newResults[block.id];
+                                                    return newResults;
+                                                })}
+                                                className="text-orange-400 hover:text-orange-600 transition-colors"
+                                            >
+                                                <span className="text-lg">×</span>
+                                            </button>
+                                        </div>
+
+                                        <div className="text-center mb-4">
+                                            <div className={`text-3xl font-semibold ${
+                                                plagiarismResults[block.id].result?.score > 20 ? 'text-red-600' :
+                                                plagiarismResults[block.id].result?.score > 10 ? 'text-yellow-600' :
+                                                'text-green-600'
+                                            }`}>
+                                                {plagiarismResults[block.id].result?.score || 0}%
+                                            </div>
+                                            <div className="text-xs text-orange-600 font-medium">Plagiarism Score</div>
+                                        </div>
+
+                                        {plagiarismResults[block.id].result && (
+                                            <div className="grid grid-cols-2 gap-3 text-xs mb-3">
+                                                <div className="bg-white/60 p-2 rounded">
+                                                    <div className="font-medium text-orange-800 mb-1">Word Stats</div>
+                                                    <div className="space-y-0.5 text-gray-600">
+                                                        <div>Total: {plagiarismResults[block.id].result.textWordCounts}</div>
+                                                        <div>Plagiarized: {plagiarismResults[block.id].result.totalPlagiarismWords}</div>
+                                                    </div>
+                                                </div>
+                                                <div className="bg-white/60 p-2 rounded">
+                                                    <div className="font-medium text-orange-800 mb-1">Sources</div>
+                                                    <div className="text-gray-600">
+                                                        Found: {plagiarismResults[block.id].result.sourceCounts || 0}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {plagiarismResults[block.id].sources && plagiarismResults[block.id].sources.length > 0 && (
+                                            <details className="group">
+                                                <summary className="cursor-pointer text-sm font-medium text-orange-700 hover:text-orange-800">
+                                                    View Sources ({plagiarismResults[block.id].sources.length})
+                                                </summary>
+                                                <div className="mt-2 space-y-2 max-h-40 overflow-y-auto pl-2">
+                                                    {plagiarismResults[block.id].sources.map((source, index) => (
+                                                        <div key={index} className="p-2 bg-white/60 rounded border-l-2 border-orange-100">
+                                                            <div className="flex justify-between items-start mb-1">
+                                                                <div className="text-xs font-medium text-gray-800 flex-1 mr-2">
+                                                                    {source.title || 'Untitled Source'}
+                                                                </div>
+                                                                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                                                                    source.score > 80 ? 'bg-red-100 text-red-700' :
+                                                                    source.score > 50 ? 'bg-yellow-100 text-yellow-700' :
+                                                                    'bg-orange-100 text-orange-700'
+                                                                }`}>
+                                                                    {source.score}%
+                                                                </span>
+                                                            </div>
+                                                            {source.url && (
+                                                                <a 
+                                                                    href={source.url} 
+                                                                    target="_blank" 
+                                                                    rel="noopener noreferrer"
+                                                                    className="text-blue-600 hover:text-blue-700 text-xs break-all block mb-1"
+                                                                >
+                                                                    {source.url.substring(0, 60)}{source.url.length > 60 ? '…' : ''}
+                                                                </a>
+                                                            )}
+                                                            <div className="text-xs text-gray-500">
+                                                                {source.plagiarismWords} / {source.totalNumberOfWords} words
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </details>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         </div>
+                    ))}
+                </div>
 
-                        {/* Block Content */}
-                        <div className="min-h-[1.5rem] py-1">
-                            {renderBlock(block)}
+                {/* Context Menu */}
+                {showContextMenu && (
+                    <div
+                        className="fixed bg-white rounded-lg shadow-xl border border-gray-200 py-2 z-50 min-w-36"
+                        style={{
+                            left: contextMenuPos.x,
+                            top: contextMenuPos.y,
+                            transform: 'translate(-50%, -100%)'
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <button
+                            onClick={handleCopy}
+                            className="flex items-center w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                        >
+                            <Copy className="h-4 w-4 mr-3 text-gray-400" />
+                            Copy
+                        </button>
+                        <button
+                            onClick={handlePaste}
+                            className="flex items-center w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                        >
+                            <Clipboard className="h-4 w-4 mr-3 text-gray-400" />
+                            Paste
+                        </button>
+                        <div className="h-px bg-gray-200 my-1" />
+                        <button
+                            onClick={handleAIConsultant}
+                            className="flex items-center w-full px-3 py-2 text-sm text-blue-700 hover:bg-blue-50 transition-colors"
+                        >
+                            <Brain className="h-4 w-4 mr-3 text-blue-500" />
+                            AI Assistant
+                        </button>
+                    </div>
+                )}
 
-                            {/* Suggestions */}
-                            {isHeading(block.type) && suggestions[block.id] && (
-                                <div className="mt-3 p-4 bg-blue-50/50 border-l-4 border-blue-200 rounded-r-lg">
-                                    <div className="flex items-start justify-between mb-2">
-                                        <div className="flex items-center">
-                                            <Sparkles className="h-4 w-4 text-blue-500 mr-2" />
-                                            <span className="font-medium text-blue-900 text-sm">Suggestions</span>
-                                        </div>
+                {/* Block Insert Menu */}
+                {showBlockMenu && (
+                    <BlockMenu
+                        position={blockMenuPos}
+                        onSelect={handleBlockMenuSelect}
+                        filter={menuFilter}
+                        onFilterChange={setMenuFilter}
+                    />
+                )}
+
+                {/* AI Consultant Panel */}
+                <AIConsultant
+                    selectedText={selectedText}
+                    show={showConsultant}
+                    onClose={() => setShowConsultant(false)}
+                />
+
+                {/* Feedback Modal */}
+                {showFeedbackModal && (
+                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                        <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+                            <div className="flex justify-between items-center mb-4">
+                                <h3 className="text-lg font-medium text-gray-900">Provide Feedback</h3>
+                                <button
+                                    onClick={() => setShowFeedbackModal(null)}
+                                    className="text-gray-400 hover:text-gray-500"
+                                >
+                                    <span className="text-lg">×</span>
+                                </button>
+                            </div>
+                            
+                            {/* Rating Scale */}
+                            <div className="mb-6">
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    How helpful was this suggestion?
+                                </label>
+                                <div className="flex justify-between">
+                                    {[1, 2, 3, 4, 5].map((rating) => (
                                         <button
-                                            onClick={() => setSuggestions((prev) => {
-                                                const newSuggestions = { ...prev };
-                                                delete newSuggestions[block.id];
-                                                return newSuggestions;
-                                            })}
-                                            className="text-blue-400 hover:text-blue-600 transition-colors"
+                                            key={rating}
+                                            onClick={() => handleSuggestionFeedback(
+                                                showFeedbackModal,
+                                                rating
+                                            )}
+                                            className={`w-10 h-10 rounded-full flex items-center justify-center text-lg transition-colors ${
+                                                suggestionFeedback[showFeedbackModal]?.rating === rating
+                                                    ? 'bg-blue-100 text-blue-600'
+                                                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                            }`}
                                         >
-                                            <span className="text-lg">×</span>
+                                            {rating}
                                         </button>
-                                    </div>
-                                    <div className="text-sm text-blue-800 leading-relaxed whitespace-pre-wrap">
-                                        {suggestions[block.id]}
-                                    </div>
+                                    ))}
                                 </div>
-                            )}
+                            </div>
 
-                            {/* AI Detection Results */}
-                            {detectionResults[block.id] && (
-                                <div className="mt-3 p-4 bg-purple-50/50 border-l-4 border-purple-200 rounded-r-lg">
-                                    <div className="flex items-start justify-between mb-3">
-                                        <div className="flex items-center">
-                                            <Shield className="h-4 w-4 text-purple-500 mr-2" />
-                                            <span className="font-medium text-purple-900 text-sm">AI Detection</span>
-                                        </div>
+                            {/* Feedback Tags */}
+                            <div className="mb-6">
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Select feedback tags
+                                </label>
+                                <div className="flex flex-wrap gap-2">
+                                    {feedbackOptions.map((option) => (
                                         <button
-                                            onClick={() => setDetectionResults((prev) => {
-                                                const newResults = { ...prev };
-                                                delete newResults[block.id];
-                                                return newResults;
-                                            })}
-                                            className="text-purple-400 hover:text-purple-600 transition-colors"
+                                            key={option.id}
+                                            onClick={() => {
+                                                const currentTags = suggestionFeedback[showFeedbackModal]?.tags || [];
+                                                const newTags = currentTags.includes(option.id)
+                                                    ? currentTags.filter(tag => tag !== option.id)
+                                                    : [...currentTags, option.id];
+                                                
+                                                handleSuggestionFeedback(
+                                                    showFeedbackModal,
+                                                    suggestionFeedback[showFeedbackModal]?.rating || 0,
+                                                    newTags
+                                                );
+                                            }}
+                                            className={`px-3 py-1.5 rounded-full text-sm flex items-center space-x-1 transition-colors ${
+                                                suggestionFeedback[showFeedbackModal]?.tags?.includes(option.id)
+                                                    ? 'bg-blue-100 text-blue-600'
+                                                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                            }`}
                                         >
-                                            <span className="text-lg">×</span>
+                                            <span>{option.icon}</span>
+                                            <span>{option.label}</span>
                                         </button>
-                                    </div>
-                                    
-                                    <div className="grid grid-cols-2 gap-3 mb-4">
-                                        <div className="text-center">
-                                            <div className="text-2xl font-semibold text-purple-600">
-                                                {detectionResults[block.id].score}%
-                                            </div>
-                                            <div className="text-xs text-purple-600 font-medium">AI Score</div>
-                                        </div>
-                                        <div className="text-center">
-                                            <div className="text-2xl font-semibold text-purple-600">
-                                                {detectionResults[block.id].readability_score || 'N/A'}
-                                            </div>
-                                            <div className="text-xs text-purple-600 font-medium">Readability</div>
-                                        </div>
-                                    </div>
-
-                                    {detectionResults[block.id].sentences && Array.isArray(detectionResults[block.id].sentences) && (
-                                        <details className="group">
-                                            <summary className="cursor-pointer text-sm font-medium text-purple-700 hover:text-purple-800 mb-2">
-                                                Sentence Analysis ({detectionResults[block.id].sentences.length})
-                                            </summary>
-                                            <div className="max-h-32 overflow-y-auto space-y-2 pl-2">
-                                                {detectionResults[block.id].sentences.map((sentence, index) => (
-                                                    <div key={index} className="text-xs p-2 bg-white/60 rounded border-l-2 border-purple-100">
-                                                        <div className="flex justify-between items-center mb-1">
-                                                            <span className="font-medium text-purple-800">#{index + 1}</span>
-                                                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                                                                sentence.score > 80 ? 'bg-red-100 text-red-700' :
-                                                                sentence.score > 50 ? 'bg-yellow-100 text-yellow-700' :
-                                                                'bg-green-100 text-green-700'
-                                                            }`}>
-                                                                {sentence.score}%
-                                                            </span>
-                                                        </div>
-                                                        <p className="text-gray-600 leading-relaxed">
-                                                            {sentence.text?.substring(0, 100)}{sentence.text?.length > 100 ? '…' : ''}
-                                                        </p>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </details>
-                                    )}
+                                    ))}
                                 </div>
-                            )}
+                            </div>
 
-                            {/* Plagiarism Results */}
-                            {plagiarismResults[block.id] && (
-                                <div className="mt-3 p-4 bg-orange-50/50 border-l-4 border-orange-200 rounded-r-lg">
-                                    <div className="flex items-start justify-between mb-3">
-                                        <div className="flex items-center">
-                                            <Search className="h-4 w-4 text-orange-500 mr-2" />
-                                            <span className="font-medium text-orange-900 text-sm">Plagiarism Check</span>
-                                        </div>
-                                        <button
-                                            onClick={() => setPlagiarismResults((prev) => {
-                                                const newResults = { ...prev };
-                                                delete newResults[block.id];
-                                                return newResults;
-                                            })}
-                                            className="text-orange-400 hover:text-orange-600 transition-colors"
-                                        >
-                                            <span className="text-lg">×</span>
-                                        </button>
-                                    </div>
-
-                                    <div className="text-center mb-4">
-                                        <div className={`text-3xl font-semibold ${
-                                            plagiarismResults[block.id].result?.score > 20 ? 'text-red-600' :
-                                            plagiarismResults[block.id].result?.score > 10 ? 'text-yellow-600' :
-                                            'text-green-600'
-                                        }`}>
-                                            {plagiarismResults[block.id].result?.score || 0}%
-                                        </div>
-                                        <div className="text-xs text-orange-600 font-medium">Plagiarism Score</div>
-                                    </div>
-
-                                    {plagiarismResults[block.id].result && (
-                                        <div className="grid grid-cols-2 gap-3 text-xs mb-3">
-                                            <div className="bg-white/60 p-2 rounded">
-                                                <div className="font-medium text-orange-800 mb-1">Word Stats</div>
-                                                <div className="space-y-0.5 text-gray-600">
-                                                    <div>Total: {plagiarismResults[block.id].result.textWordCounts}</div>
-                                                    <div>Plagiarized: {plagiarismResults[block.id].result.totalPlagiarismWords}</div>
-                                                </div>
-                                            </div>
-                                            <div className="bg-white/60 p-2 rounded">
-                                                <div className="font-medium text-orange-800 mb-1">Sources</div>
-                                                <div className="text-gray-600">
-                                                    Found: {plagiarismResults[block.id].result.sourceCounts || 0}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {plagiarismResults[block.id].sources && plagiarismResults[block.id].sources.length > 0 && (
-                                        <details className="group">
-                                            <summary className="cursor-pointer text-sm font-medium text-orange-700 hover:text-orange-800">
-                                                View Sources ({plagiarismResults[block.id].sources.length})
-                                            </summary>
-                                            <div className="mt-2 space-y-2 max-h-40 overflow-y-auto pl-2">
-                                                {plagiarismResults[block.id].sources.map((source, index) => (
-                                                    <div key={index} className="p-2 bg-white/60 rounded border-l-2 border-orange-100">
-                                                        <div className="flex justify-between items-start mb-1">
-                                                            <div className="text-xs font-medium text-gray-800 flex-1 mr-2">
-                                                                {source.title || 'Untitled Source'}
-                                                            </div>
-                                                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                                                                source.score > 80 ? 'bg-red-100 text-red-700' :
-                                                                source.score > 50 ? 'bg-yellow-100 text-yellow-700' :
-                                                                'bg-orange-100 text-orange-700'
-                                                            }`}>
-                                                                {source.score}%
-                                                            </span>
-                                                        </div>
-                                                        {source.url && (
-                                                            <a 
-                                                                href={source.url} 
-                                                                target="_blank" 
-                                                                rel="noopener noreferrer"
-                                                                className="text-blue-600 hover:text-blue-700 text-xs break-all block mb-1"
-                                                            >
-                                                                {source.url.substring(0, 60)}{source.url.length > 60 ? '…' : ''}
-                                                            </a>
-                                                        )}
-                                                        <div className="text-xs text-gray-500">
-                                                            {source.plagiarismWords} / {source.totalNumberOfWords} words
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </details>
-                                    )}
-                                </div>
-                            )}
+                            <div className="flex justify-end">
+                                <button
+                                    onClick={() => setShowFeedbackModal(null)}
+                                    className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-md transition-colors"
+                                >
+                                    Close
+                                </button>
+                            </div>
                         </div>
                     </div>
-                ))}
+                )}
             </div>
-
-            {/* Context Menu */}
-            {showContextMenu && (
-                <div
-                    className="fixed bg-white rounded-lg shadow-xl border border-gray-200 py-2 z-50 min-w-36"
-                    style={{
-                        left: contextMenuPos.x,
-                        top: contextMenuPos.y,
-                        transform: 'translate(-50%, -100%)'
-                    }}
-                    onClick={(e) => e.stopPropagation()}
-                >
-                    <button
-                        onClick={handleCopy}
-                        className="flex items-center w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                    >
-                        <Copy className="h-4 w-4 mr-3 text-gray-400" />
-                        Copy
-                    </button>
-                    <button
-                        onClick={handlePaste}
-                        className="flex items-center w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                    >
-                        <Clipboard className="h-4 w-4 mr-3 text-gray-400" />
-                        Paste
-                    </button>
-                    <div className="h-px bg-gray-200 my-1" />
-                    <button
-                        onClick={handleAIConsultant}
-                        className="flex items-center w-full px-3 py-2 text-sm text-blue-700 hover:bg-blue-50 transition-colors"
-                    >
-                        <Brain className="h-4 w-4 mr-3 text-blue-500" />
-                        AI Assistant
-                    </button>
-                </div>
-            )}
-
-            {/* Block Insert Menu */}
-            {showBlockMenu && (
-                <BlockMenu
-                    position={blockMenuPos}
-                    onSelect={handleBlockMenuSelect}
-                    filter={menuFilter}
-                    onFilterChange={setMenuFilter}
-                />
-            )}
-
-            {/* AI Consultant Panel */}
-            <AIConsultant
-                selectedText={selectedText}
-                show={showConsultant}
-                onClose={() => setShowConsultant(false)}
-            />
         </div>
-    </div>
-);
+    );
 }
