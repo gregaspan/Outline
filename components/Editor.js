@@ -533,7 +533,7 @@ Please provide only 1 specific, actionable suggestions for improvement - do not 
             setSuggestions((prev) => ({
                 ...prev,
                 [headingId]:
-                    "Error getting suggestions. Please check your API configuration and try again.",
+                    "Error getting suggestions. Please try again.",
             }));
         } finally {
             setLoadingSuggestions((prev) => {
