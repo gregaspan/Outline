@@ -412,18 +412,24 @@ export default function Editor() {
             .filter((content) => content.trim())
             .join("\n\n");
 
-        const prompt = `Please analyze the following chapter and provide specific, actionable improvement suggestions. Focus on:
-1. Content clarity and structure
-2. Writing style and flow
-3. Missing information or gaps
-4. Better organization of ideas
-5. Engagement and readability
+            const prompt = `You are a helpful academic writing assistant.
 
-Chapter content:
-${formattedContent}
-
-Please provide only 1 specific, actionable suggestions for improvement - do not write anything else. Write in slovenian language. Only format the text using break lines - add one after each suggestion, no other formatting. Do not try to make any text bold or italic.`;
-
+            Please read the following chapter (written in Slovenian) and give exactly **one** specific, actionable suggestion to improve it.
+            
+            Focus on:
+            1. Content clarity and structure
+            2. Writing style and flow
+            3. Missing information or logical gaps
+            4. Better organization of ideas
+            5. Engagement and readability
+            
+            Chapter content:
+            ${formattedContent}
+            
+            🟢 Please reply with:
+            - One actionable suggestion for improving this paragraph, written in Slovenian.
+            - Use a new line after your suggestion. Do not add any bullet points, bold text, or additional formatting.
+            - Do NOT explain your reasoning. Do NOT add any intro or outro. Just one suggestion only.`
         // Log to console
         console.log({
             text: suggestions[blockId],
@@ -458,6 +464,11 @@ Please provide only 1 specific, actionable suggestions for improvement - do not 
         }
 
         setShowFeedbackModal(null);
+        setSuggestions(prev => {
+            const newSuggestions = { ...prev };
+            delete newSuggestions[blockId];
+            return newSuggestions;
+        });
     };
 
     const suggestImprovements = async (headingId) => {
@@ -526,6 +537,11 @@ Please provide only 1 specific, actionable suggestions for improvement - do not 
                 ...prev,
                 [headingId]: suggestionText,
             }));
+            setSuggestionFeedback((prev) => {
+                const newFeedback = { ...prev };
+                delete newFeedback[headingId];
+                return newFeedback;
+            });
         } catch (error) {
             console.error("Error getting suggestions:", error);
             setSuggestions((prev) => ({
@@ -846,7 +862,7 @@ Please provide only 1 specific, actionable suggestions for improvement - do not 
                 <div {...common} className="flex-1 outline-none">
                     {content}
                 </div>
-                <div className="opacity-0 group-hover/heading:opacity-100 transition-opacity flex items-center">
+                <div className={`transition-opacity flex items-center ${loadingSuggestions.has(block.id) ? 'opacity-100' : 'opacity-0 group-hover/heading:opacity-100'}`}>
                     {ttsButton}
                     {aiDetectionButton}
                     {plagiarismButton}
