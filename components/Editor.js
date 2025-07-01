@@ -97,16 +97,12 @@ export default function Editor() {
 
     const refs = useRef({});
     const availableModels = [
-        "openai/o1",
         "openai/gpt-4o",
-        "anthropic/claude-sonnet-4",
-        "anthropic/claude-opus-4",
-        "deepseek/deepseek-r1",
-        "deepseek/deepseek-chat",
+        "anthropic/claude-3.5-sonnet",
         "google/gemini-2.5-pro",
-        "google/gemini-2.5-flash",
-        "perplexity/sonar",
-        "perplexity/sonar-pro"
+        "perplexity/sonar-pro",
+        "deepseek/deepseek-r1",
+        "x-ai/grok-3-mini-beta"
     ];
 
     const getRandomModel = () => {
@@ -460,6 +456,8 @@ Please provide only 1 specific, actionable suggestions for improvement - do not 
         } catch (error) {
             console.error('Error saving feedback:', error);
         }
+
+        setShowFeedbackModal(null);
     };
 
     const suggestImprovements = async (headingId) => {
